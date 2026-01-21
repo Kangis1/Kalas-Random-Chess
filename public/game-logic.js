@@ -41,6 +41,7 @@ class KalasRandomChess {
         this.winner = null;
         this.lastMove = null;
         this.moveHistory = [];
+        this.enPassantTarget = null; // Square where en passant capture is possible
 
         // Timer properties (time in milliseconds)
         this.timeControl = timeControl; // minutes
@@ -254,11 +255,20 @@ class KalasRandomChess {
         const row = this.getRow(fromIndex);
         const col = this.getCol(fromIndex);
         const direction = color === 'white' ? 1 : -1;
+        const startRow = color === 'white' ? 1 : 6; // 2nd rank for each color
 
-        // Forward move
+        // Forward move (one square)
         const forwardOne = fromIndex + (8 * direction);
         if (forwardOne >= 0 && forwardOne < 64 && !this.board[forwardOne]) {
             moves.push({ to: forwardOne, isCapture: false });
+
+            // Double move from starting rank
+            if (row === startRow) {
+                const forwardTwo = fromIndex + (16 * direction);
+                if (forwardTwo >= 0 && forwardTwo < 64 && !this.board[forwardTwo]) {
+                    moves.push({ to: forwardTwo, isCapture: false, isDoublePush: true });
+                }
+            }
         }
 
         // Diagonal captures
@@ -273,6 +283,18 @@ class KalasRandomChess {
                 if (targetPiece && this.getPieceColor(targetPiece) !== color) {
                     moves.push({ to: captureIndex, isCapture: true });
                 }
+            }
+        }
+
+        // En passant
+        if (this.enPassantTarget !== null) {
+            const epCol = this.getCol(this.enPassantTarget);
+            // Check if pawn is adjacent to en passant target column and on correct rank
+            const epRow = color === 'white' ? 4 : 3; // Row where en passant capture happens
+            if (row === epRow && Math.abs(col - epCol) === 1) {
+                // The en passant target is the square the capturing pawn moves to
+                const epCaptureSquare = this.enPassantTarget;
+                moves.push({ to: epCaptureSquare, isCapture: true, isEnPassant: true });
             }
         }
 
@@ -512,7 +534,7 @@ class KalasRandomChess {
         }
 
         // Record the move
-        const capturedPiece = this.board[toIndex];
+        let capturedPiece = this.board[toIndex];
         const moveRecord = {
             from: fromIndex,
             to: toIndex,
@@ -521,9 +543,27 @@ class KalasRandomChess {
             moveNumber: this.moveNumber
         };
 
+        // Handle en passant capture
+        if (move.isEnPassant) {
+            // The captured pawn is on a different square than where we're moving
+            const capturedPawnIndex = toIndex + (pieceColor === 'white' ? -8 : 8);
+            capturedPiece = this.board[capturedPawnIndex];
+            moveRecord.captured = capturedPiece;
+            moveRecord.isEnPassant = true;
+            this.board[capturedPawnIndex] = null;
+        }
+
         // Execute the move
         this.board[toIndex] = piece;
         this.board[fromIndex] = null;
+
+        // Set en passant target if this was a double pawn push
+        if (move.isDoublePush) {
+            // En passant target is the square the pawn skipped over
+            this.enPassantTarget = fromIndex + (8 * (pieceColor === 'white' ? 1 : -1));
+        } else {
+            this.enPassantTarget = null;
+        }
 
         // Handle pawn promotion (auto-queen for simplicity)
         if ((piece === PIECES.WHITE_PAWN && this.getRow(toIndex) === 7) ||
@@ -625,7 +665,8 @@ class KalasRandomChess {
             moveHistory: [...this.moveHistory],
             whiteTime: this.whiteTime,
             blackTime: this.blackTime,
-            timeControl: this.timeControl
+            timeControl: this.timeControl,
+            enPassantTarget: this.enPassantTarget
         };
     }
 
@@ -642,6 +683,7 @@ class KalasRandomChess {
         this.whiteTime = state.whiteTime ?? this.whiteTime;
         this.blackTime = state.blackTime ?? this.blackTime;
         this.timeControl = state.timeControl ?? this.timeControl;
+        this.enPassantTarget = state.enPassantTarget ?? null;
     }
 
     // Resign

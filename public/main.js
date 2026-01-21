@@ -18,7 +18,46 @@ let aiThinking = false;
 document.addEventListener('DOMContentLoaded', () => {
     initializeSocket();
     initializeEventListeners();
+    checkForActiveGame();
 });
+
+// Check if there's an active game to rejoin after page refresh
+function checkForActiveGame() {
+    const savedGame = localStorage.getItem('activeGame');
+    if (savedGame) {
+        try {
+            const gameData = JSON.parse(savedGame);
+            // Only try to reconnect if the game data is recent (within last hour)
+            if (Date.now() - gameData.savedAt < 3600000) {
+                currentGameId = gameData.gameId;
+                playerColor = gameData.playerColor;
+                // Request reconnection from server
+                socket.emit('reconnectGame', { gameId: gameData.gameId });
+            } else {
+                // Clear stale game data
+                localStorage.removeItem('activeGame');
+            }
+        } catch (e) {
+            localStorage.removeItem('activeGame');
+        }
+    }
+}
+
+// Save current game to localStorage
+function saveActiveGame() {
+    if (currentGameId && playerColor && !isLocalGame && !isAIGame) {
+        localStorage.setItem('activeGame', JSON.stringify({
+            gameId: currentGameId,
+            playerColor: playerColor,
+            savedAt: Date.now()
+        }));
+    }
+}
+
+// Clear saved game from localStorage
+function clearActiveGame() {
+    localStorage.removeItem('activeGame');
+}
 
 // Initialize Socket.io connection
 function initializeSocket() {
@@ -56,6 +95,22 @@ function initializeSocket() {
         playerColor = data.color;
         Sounds.opponentJoined();
         startOnlineGame(data.gameState, data.color);
+    });
+
+    // Opponent made a move
+    // Our move was confirmed by server - sync state
+    socket.on('moveConfirmed', (data) => {
+        if (boardUI && game) {
+            // Sync our local state with server's authoritative state
+            game.loadState(data.gameState);
+            boardUI.render();
+            UI.updateGameInfo(game);
+            updateTimerDisplay();
+
+            if (data.gameStatus && data.gameStatus.gameOver) {
+                handleGameEnd(data.gameStatus);
+            }
+        }
     });
 
     // Opponent made a move
@@ -494,6 +549,9 @@ function startOnlineGame(gameState, color) {
     game = new KalasRandomChess(gameState.timeControl || 10);
     game.loadState(gameState);
 
+    // Save game for reconnection on refresh
+    saveActiveGame();
+
     const boardElement = document.getElementById('chess-board');
     boardUI = new ChessBoardUI(boardElement, game);
     boardUI.setPlayerColor(color);
@@ -640,6 +698,7 @@ function showRules() {
 // Handle game end
 function handleGameEnd(status) {
     stopTimerInterval();
+    clearActiveGame(); // Clear saved game since game is over
     aiThinking = false;
     UI.showAIThinking(false);
 
@@ -712,6 +771,7 @@ function resignGame() {
 // Return to menu
 function returnToMenu() {
     stopTimerInterval();
+    clearActiveGame(); // Clear saved game
     currentGameId = null;
     playerColor = null;
     game = null;

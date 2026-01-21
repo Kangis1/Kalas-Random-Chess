@@ -231,10 +231,18 @@ io.on('connection', (socket) => {
         // Reset timestamp for the new player's turn
         gameData.game.lastTimestamp = Date.now();
 
+        const gameState = gameData.game.getState();
+
+        // Send confirmation to the player who made the move
+        socket.emit('moveConfirmed', {
+            gameState: gameState,
+            gameStatus: result.gameStatus
+        });
+
         // Broadcast to opponent
         const opponentId = playerColor === 'white' ? gameData.black : gameData.white;
         io.to(opponentId).emit('moveMade', {
-            gameState: gameData.game.getState(),
+            gameState: gameState,
             gameStatus: result.gameStatus
         });
 
