@@ -276,6 +276,12 @@ body {
 #waiting-room {
     max-width: 400px;
     margin: 0 auto;
+    text-align: center;
+}
+
+#waiting-room h3 {
+    color: #f39c12;
+    margin-bottom: 15px;
 }
 
 .game-code {
@@ -287,6 +293,20 @@ body {
     border-radius: 10px;
     margin: 20px 0;
     font-family: monospace;
+}
+
+.waiting-info {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.waiting-hint {
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 20px;
 }
 
 .waiting-text {

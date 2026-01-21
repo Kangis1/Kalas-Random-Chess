@@ -35,8 +35,11 @@ function initializeSocket() {
     // Game created - waiting for opponent
     socket.on('gameCreated', (data) => {
         currentGameId = data.gameId;
-        document.getElementById('game-code-display').textContent = data.gameId;
+        document.getElementById('waiting-code-display').textContent = '#' + data.gameId;
+        document.getElementById('waiting-time-display').textContent = data.timeControl + ' min';
         UI.hide('time-control-select');
+        UI.hide('create-table-form');
+        UI.hide('online-lobby');
         UI.show('waiting-room');
     });
 
@@ -289,6 +292,7 @@ function cancelWaiting() {
     }
     currentGameId = null;
     UI.hide('waiting-room');
+    UI.show('online-lobby');
 }
 
 // Start AI game

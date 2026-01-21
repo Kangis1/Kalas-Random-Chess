@@ -61,10 +61,14 @@
             </div>
 
             <div id="waiting-room" class="hidden">
-                <p>Game created! Share this code:</p>
-                <div class="game-code" id="game-code-display"></div>
-                <p class="waiting-text">Waiting for opponent...</p>
-                <button id="btn-cancel-waiting" class="btn btn-text">Cancel</button>
+                <h3>Table Created</h3>
+                <p class="waiting-text">Waiting for opponent to join...</p>
+                <div class="waiting-info">
+                    <span class="table-time" id="waiting-time-display">10 min</span>
+                    <span class="table-code" id="waiting-code-display">#ABC123</span>
+                </div>
+                <p class="waiting-hint">Your table is visible in the lobby</p>
+                <button id="btn-cancel-waiting" class="btn btn-danger">Cancel Table</button>
             </div>
 
             <!-- Online Lobby -->
