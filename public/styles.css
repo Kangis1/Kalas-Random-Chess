@@ -140,10 +140,6 @@ body {
     min-width: 80px;
 }
 
-.btn-time[data-time="0"] {
-    font-size: 0.85rem;
-}
-
 .btn-time:hover {
     background: #34495e;
     border-color: #f39c12;
