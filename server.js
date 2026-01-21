@@ -121,13 +121,22 @@ io.on('connection', (socket) => {
             return;
         }
 
-        if (gameData.white === socket.id) {
+        const creatorId = gameData.white; // Creator was temporarily stored as white
+        if (creatorId === socket.id) {
             socket.emit('error', { message: 'Cannot join your own game' });
             return;
         }
 
-        // Join the game as black
-        gameData.black = socket.id;
+        // Randomly assign colors
+        const creatorIsWhite = Math.random() < 0.5;
+        if (creatorIsWhite) {
+            gameData.white = creatorId;
+            gameData.black = socket.id;
+        } else {
+            gameData.white = socket.id;
+            gameData.black = creatorId;
+        }
+
         gameData.state = 'playing';
         playerGames.set(socket.id, gameId);
         socket.join(gameId);
@@ -139,17 +148,17 @@ io.on('connection', (socket) => {
         // Notify both players
         const gameState = gameData.game.getState();
 
-        // Notify the joining player (black)
+        // Notify the joining player
         socket.emit('gameJoined', {
             gameId,
-            color: 'black',
+            color: creatorIsWhite ? 'black' : 'white',
             gameState
         });
 
-        // Notify the creating player (white)
-        io.to(gameData.white).emit('gameStart', {
+        // Notify the creating player
+        io.to(creatorId).emit('gameStart', {
             gameId,
-            color: 'white',
+            color: creatorIsWhite ? 'white' : 'black',
             gameState
         });
 
