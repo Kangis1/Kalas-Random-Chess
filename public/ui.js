@@ -70,15 +70,7 @@ class ChessBoardUI {
                     square.classList.add('selected');
                 }
 
-                // Highlight valid moves
-                const validMove = this.validMoves.find(m => m.to === index);
-                if (validMove) {
-                    if (validMove.isCapture) {
-                        square.classList.add('valid-capture');
-                    } else {
-                        square.classList.add('valid-move');
-                    }
-                }
+                // Valid move highlighting removed - players must figure out moves themselves
 
                 // Highlight last move
                 if (this.game.lastMove) {

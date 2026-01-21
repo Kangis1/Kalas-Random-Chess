@@ -242,8 +242,8 @@ class KalasRandomChess {
             moves = moves.filter(move => !move.isCapture);
         }
 
-        // Filter out moves that would leave king in check
-        moves = moves.filter(move => !this.wouldBeInCheck(fromIndex, move.to, pieceColor));
+        // Note: Players CAN make moves that leave their king in check
+        // If they do, they lose the game (checked after the move)
 
         return moves;
     }
@@ -561,6 +561,21 @@ class KalasRandomChess {
     // Check game status (checkmate, stalemate, etc.)
     checkGameStatus() {
         const currentColor = this.currentTurn;
+        const previousColor = currentColor === 'white' ? 'black' : 'white';
+
+        // Check if the player who just moved left their own king in check
+        // This means they lose the game
+        if (this.isInCheck(previousColor)) {
+            this.gameOver = true;
+            this.winner = currentColor;
+            return {
+                gameOver: true,
+                result: 'left-in-check',
+                winner: this.winner,
+                message: `${previousColor.charAt(0).toUpperCase() + previousColor.slice(1)} left their king in check and loses!`
+            };
+        }
+
         const inCheck = this.isInCheck(currentColor);
         const hasMoves = this.hasValidMoves(currentColor);
 
