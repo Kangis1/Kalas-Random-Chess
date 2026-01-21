@@ -377,15 +377,17 @@ body {
 
 /* Game Screen */
 #game-screen {
-    padding-top: 20px;
+    padding-top: 10px;
+    max-height: 100vh;
+    overflow-y: auto;
 }
 
 .game-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
-    padding: 15px 20px;
+    margin-bottom: 10px;
+    padding: 10px 15px;
     background: rgba(44, 62, 80, 0.5);
     border-radius: 10px;
 }
@@ -482,21 +484,26 @@ body {
     display: grid;
     grid-template-columns: repeat(8, 1fr);
     grid-template-rows: repeat(8, 1fr);
-    width: min(90vw, 560px);
-    height: min(90vw, 560px);
+    width: min(85vw, 560px);
+    height: min(85vw, 560px);
     border: 4px solid #34495e;
     border-radius: 4px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    aspect-ratio: 1 / 1;
 }
 
 .square {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: min(10vw, 50px);
     cursor: pointer;
     position: relative;
     transition: background-color 0.15s ease;
+}
+
+.square .piece {
+    font-size: clamp(24px, 8vw, 50px);
+    line-height: 1;
 }
 
 .square.light {
@@ -730,13 +737,91 @@ body {
 
 /* Responsive */
 @media (max-width: 600px) {
+    #app {
+        padding: 10px;
+    }
+
     #menu-screen h1 {
         font-size: 2rem;
     }
 
+    #game-screen {
+        padding-top: 5px;
+    }
+
     .game-header {
-        flex-direction: column;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: space-around;
+        gap: 8px;
+        padding: 8px 10px;
+        margin-bottom: 8px;
+    }
+
+    .game-info {
+        order: -1;
+        width: 100%;
+        flex-direction: row;
+        justify-content: center;
         gap: 10px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .player-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .player-name {
+        font-size: 0.9rem;
+    }
+
+    .player-status {
+        font-size: 0.7rem;
+    }
+
+    .timer {
+        font-size: 1.2rem;
+        padding: 5px 10px;
+        min-width: 70px;
+        margin-top: 5px;
+    }
+
+    #board-container {
+        margin-bottom: 10px;
+    }
+
+    #chess-board {
+        width: min(92vw, 400px);
+        height: min(92vw, 400px);
+        border-width: 2px;
+    }
+
+    .square .piece {
+        font-size: clamp(20px, 10vw, 40px);
+    }
+
+    .restriction-warning {
+        font-size: 0.75rem;
+        padding: 3px 10px;
+    }
+
+    #move-number {
+        font-size: 0.8rem;
+    }
+
+    #turn-indicator {
+        font-size: 1rem;
+    }
+
+    .game-controls {
+        gap: 10px;
+    }
+
+    .game-controls .btn {
+        padding: 10px 20px;
+        font-size: 0.9rem;
     }
 
     .game-code {

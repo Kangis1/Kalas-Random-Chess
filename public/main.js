@@ -116,19 +116,49 @@ function initializeSocket() {
         }
     });
 
-    // Opponent disconnected
-    socket.on('opponentDisconnected', () => {
-        UI.notify('Opponent disconnected');
+    // Opponent disconnected (but can reconnect)
+    socket.on('opponentDisconnected', (data) => {
         if (game && !game.gameOver) {
             stopTimerInterval();
+            UI.showGameMessage('Opponent Disconnected', 'Waiting for opponent to reconnect... (60 seconds)');
+        }
+    });
+
+    // Opponent reconnected
+    socket.on('opponentReconnected', (data) => {
+        if (game) {
+            game.loadState(data.gameState);
+            boardUI.render();
+            UI.updateGameInfo(game);
+            updateTimerDisplay();
+            UI.hideGameMessage();
+            game.lastTimestamp = Date.now();
+            startTimerInterval();
+            Sounds.opponentJoined();
+        }
+    });
+
+    // Opponent forfeited due to disconnect timeout
+    socket.on('opponentForfeit', (data) => {
+        if (game && !game.gameOver) {
+            game.gameOver = true;
+            game.winner = data.winner;
             Sounds.victory();
             handleGameEnd({
                 gameOver: true,
-                result: 'disconnect',
-                winner: playerColor,
-                message: 'Opponent disconnected. You win!'
+                result: 'forfeit',
+                winner: data.winner,
+                message: data.message
             });
         }
+    });
+
+    // Successfully reconnected to game
+    socket.on('gameReconnected', (data) => {
+        currentGameId = data.gameId;
+        playerColor = data.color;
+        Sounds.opponentJoined();
+        startOnlineGame(data.gameState, data.color);
     });
 
     // Error handling

@@ -299,6 +299,63 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Handle reconnection to a game
+    socket.on('reconnectGame', ({ gameId }) => {
+        const gameData = games.get(gameId);
+
+        if (!gameData || gameData.state !== 'paused') {
+            socket.emit('error', { message: 'Game not found or not paused' });
+            return;
+        }
+
+        // Determine which player is reconnecting
+        const isWhite = gameData.disconnectedPlayer === 'white';
+        const isBlack = gameData.disconnectedPlayer === 'black';
+
+        if (!isWhite && !isBlack) {
+            socket.emit('error', { message: 'No disconnected player to replace' });
+            return;
+        }
+
+        // Update the player's socket ID
+        if (isWhite) {
+            gameData.white = socket.id;
+        } else {
+            gameData.black = socket.id;
+        }
+
+        playerGames.set(socket.id, gameId);
+        socket.join(gameId);
+
+        // Clear reconnect timeout
+        if (gameData.reconnectTimeout) {
+            clearTimeout(gameData.reconnectTimeout);
+            delete gameData.reconnectTimeout;
+        }
+
+        // Resume the game
+        gameData.state = 'playing';
+        delete gameData.disconnectedPlayer;
+        gameData.game.lastTimestamp = Date.now();
+        startGameTimer(gameId);
+
+        const gameState = gameData.game.getState();
+        const playerColor = isWhite ? 'white' : 'black';
+
+        // Notify reconnected player
+        socket.emit('gameReconnected', {
+            gameId,
+            color: playerColor,
+            gameState
+        });
+
+        // Notify opponent that player reconnected
+        const opponentId = isWhite ? gameData.black : gameData.white;
+        io.to(opponentId).emit('opponentReconnected', { gameState });
+
+        console.log(`Player reconnected to game ${gameId} as ${playerColor}`);
+    });
+
     // Handle disconnection
     socket.on('disconnect', () => {
         console.log(`Player disconnected: ${socket.id}`);
@@ -313,13 +370,41 @@ io.on('connection', (socket) => {
                     games.delete(gameId);
                     broadcastLobbyUpdate(); // Game removed from lobby
                 } else if (gameData.state === 'playing') {
-                    // Stop timer and notify opponent
+                    // Pause the game and allow reconnection
                     stopGameTimer(gameId);
-                    const opponentId = gameData.white === socket.id ? gameData.black : gameData.white;
+                    gameData.game.updateTime(); // Save current time
+
+                    const playerColor = gameData.white === socket.id ? 'white' : 'black';
+                    gameData.disconnectedPlayer = playerColor;
+                    gameData.state = 'paused';
+
+                    const opponentId = playerColor === 'white' ? gameData.black : gameData.white;
                     if (opponentId) {
-                        io.to(opponentId).emit('opponentDisconnected');
+                        io.to(opponentId).emit('opponentDisconnected', {
+                            canReconnect: true,
+                            gameId: gameId
+                        });
                     }
-                    gameData.state = 'finished';
+
+                    // Set timeout for auto-forfeit (60 seconds)
+                    gameData.reconnectTimeout = setTimeout(() => {
+                        if (gameData.state === 'paused') {
+                            gameData.state = 'finished';
+                            const winner = playerColor === 'white' ? 'black' : 'white';
+                            gameData.game.gameOver = true;
+                            gameData.game.winner = winner;
+
+                            if (opponentId) {
+                                io.to(opponentId).emit('opponentForfeit', {
+                                    winner: winner,
+                                    message: `Opponent failed to reconnect. ${winner.charAt(0).toUpperCase() + winner.slice(1)} wins!`
+                                });
+                            }
+                            console.log(`Game ${gameId} forfeited due to disconnect timeout`);
+                        }
+                    }, 60000); // 60 second reconnect window
+
+                    console.log(`Game ${gameId} paused - waiting for ${playerColor} to reconnect`);
                 }
             }
 
