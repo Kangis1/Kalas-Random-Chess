@@ -438,6 +438,31 @@ body {
     background: rgba(231, 76, 60, 0.2);
 }
 
+/* Captured Pieces Display */
+.captured-pieces {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px;
+    margin-top: 5px;
+    min-height: 20px;
+    max-width: 120px;
+}
+
+.captured-piece {
+    font-size: 0.9rem;
+    line-height: 1;
+    opacity: 0.9;
+}
+
+.captured-piece.white-piece {
+    color: #8a2be2;
+}
+
+.captured-piece.black-piece {
+    color: #000000;
+}
+
 @keyframes timerPulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }
@@ -786,6 +811,14 @@ body {
         padding: 5px 10px;
         min-width: 70px;
         margin-top: 5px;
+    }
+
+    .captured-pieces {
+        max-width: 90px;
+    }
+
+    .captured-piece {
+        font-size: 0.75rem;
     }
 
     #board-container {

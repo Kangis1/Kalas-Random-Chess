@@ -699,8 +699,14 @@ class KalasRandomChess {
         };
     }
 
+    // Check if game is untimed
+    isUntimed() {
+        return this.timeControl === 0;
+    }
+
     // Timer methods
     startTimer() {
+        if (this.isUntimed()) return; // Don't start timer for untimed games
         this.lastTimestamp = Date.now();
         this.timerRunning = true;
     }
@@ -714,6 +720,7 @@ class KalasRandomChess {
 
     // Update time for current player
     updateTime() {
+        if (this.isUntimed()) return; // No time tracking for untimed games
         if (!this.timerRunning || !this.lastTimestamp) return;
 
         const now = Date.now();
@@ -729,6 +736,7 @@ class KalasRandomChess {
 
     // Check if a player has run out of time
     checkTimeout() {
+        if (this.isUntimed()) return null; // No timeout for untimed games
         this.updateTime();
 
         if (this.whiteTime <= 0) {

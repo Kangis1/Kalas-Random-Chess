@@ -75,7 +75,7 @@ function initializeSocket() {
     socket.on('gameCreated', (data) => {
         currentGameId = data.gameId;
         document.getElementById('waiting-code-display').textContent = '#' + data.gameId;
-        document.getElementById('waiting-time-display').textContent = data.timeControl + ' min';
+        document.getElementById('waiting-time-display').textContent = data.timeControl === 0 ? 'Untimed' : data.timeControl + ' min';
         UI.hide('time-control-select');
         UI.hide('create-table-form');
         UI.hide('online-lobby');
@@ -106,6 +106,7 @@ function initializeSocket() {
             boardUI.render();
             UI.updateGameInfo(game);
             updateTimerDisplay();
+            updateCapturedPieces();
 
             if (data.gameStatus && data.gameStatus.gameOver) {
                 handleGameEnd(data.gameStatus);
@@ -122,6 +123,7 @@ function initializeSocket() {
             boardUI.updateFromState(data.gameState);
             UI.updateGameInfo(game);
             updateTimerDisplay();
+            updateCapturedPieces();
 
             // Play appropriate sound
             if (data.gameStatus && data.gameStatus.inCheck) {
@@ -186,6 +188,7 @@ function initializeSocket() {
             boardUI.render();
             UI.updateGameInfo(game);
             updateTimerDisplay();
+            updateCapturedPieces();
             UI.hideGameMessage();
             game.lastTimestamp = Date.now();
             startTimerInterval();
@@ -408,6 +411,7 @@ function startAIGame() {
 
         UI.updateGameInfo(game);
         updateTimerDisplay();
+        updateCapturedPieces();
 
         if (result.gameStatus && result.gameStatus.gameOver) {
             handleGameEnd(result.gameStatus);
@@ -433,8 +437,9 @@ function startAIGame() {
     document.getElementById('white-status').textContent = '(You)';
     document.getElementById('black-status').textContent = `(AI - ${difficultyLabel})`;
 
-    // Initialize timers
+    // Initialize timers and captured pieces
     updateTimerDisplay();
+    updateCapturedPieces();
     game.startTimer();
     startTimerInterval();
 
@@ -472,6 +477,7 @@ async function makeAIMove() {
 
                 UI.updateGameInfo(game);
                 updateTimerDisplay();
+                updateCapturedPieces();
 
                 if (result.gameStatus && result.gameStatus.gameOver) {
                     handleGameEnd(result.gameStatus);
@@ -511,6 +517,7 @@ function startLocalGame() {
         }
 
         UI.updateGameInfo(game);
+        updateCapturedPieces();
 
         if (result.gameStatus && result.gameStatus.gameOver) {
             handleGameEnd(result.gameStatus);
@@ -531,8 +538,9 @@ function startLocalGame() {
     document.getElementById('white-status').textContent = '(Player 1)';
     document.getElementById('black-status').textContent = '(Player 2)';
 
-    // Initialize timers
+    // Initialize timers and captured pieces
     updateTimerDisplay();
+    updateCapturedPieces();
     game.startTimer();
     startTimerInterval();
 
@@ -576,6 +584,7 @@ function startOnlineGame(gameState, color) {
         });
 
         UI.updateGameInfo(game);
+        updateCapturedPieces();
 
         if (result.gameStatus && result.gameStatus.gameOver) {
             handleGameEnd(result.gameStatus);
@@ -596,8 +605,9 @@ function startOnlineGame(gameState, color) {
     document.getElementById('white-status').textContent = color === 'white' ? '(You)' : '(Opponent)';
     document.getElementById('black-status').textContent = color === 'black' ? '(You)' : '(Opponent)';
 
-    // Initialize timers
+    // Initialize timers and captured pieces
     updateTimerDisplay();
+    updateCapturedPieces();
     game.startTimer();
     startTimerInterval();
 
@@ -664,15 +674,75 @@ function stopTimerInterval() {
     }
 }
 
+// Update captured pieces display
+function updateCapturedPieces() {
+    if (!game) return;
+
+    // Piece glyphs mapping
+    const pieceGlyphs = {
+        'K': '\u265A', 'Q': '\u265B', 'R': '\u265C', 'B': '\u265D', 'N': '\u265E', 'P': '\u265F',
+        'k': '\u265A', 'q': '\u265B', 'r': '\u265C', 'b': '\u265D', 'n': '\u265E', 'p': '\u265F'
+    };
+
+    // Piece order for sorting (queen first, then rooks, bishops, knights, pawns)
+    const pieceOrder = { 'q': 0, 'Q': 0, 'r': 1, 'R': 1, 'b': 2, 'B': 2, 'n': 3, 'N': 3, 'p': 4, 'P': 4 };
+
+    // Collect captured pieces by color
+    const whiteCaptured = []; // Pieces white has captured (black pieces)
+    const blackCaptured = []; // Pieces black has captured (white pieces)
+
+    for (const move of game.moveHistory) {
+        if (move.captured) {
+            const capturedPiece = move.captured;
+            // Determine who captured whom based on piece case
+            if (capturedPiece === capturedPiece.toLowerCase()) {
+                // Lowercase = black piece was captured by white
+                whiteCaptured.push(capturedPiece);
+            } else {
+                // Uppercase = white piece was captured by black
+                blackCaptured.push(capturedPiece);
+            }
+        }
+    }
+
+    // Sort by piece value (most valuable first)
+    const sortPieces = (a, b) => pieceOrder[a.toLowerCase()] - pieceOrder[b.toLowerCase()];
+    whiteCaptured.sort(sortPieces);
+    blackCaptured.sort(sortPieces);
+
+    // Render captured pieces
+    const whiteCapturedEl = document.getElementById('white-captured');
+    const blackCapturedEl = document.getElementById('black-captured');
+
+    // White's captured pieces (black pieces they took)
+    whiteCapturedEl.innerHTML = whiteCaptured.map(p =>
+        `<span class="captured-piece black-piece">${pieceGlyphs[p]}</span>`
+    ).join('');
+
+    // Black's captured pieces (white pieces they took)
+    blackCapturedEl.innerHTML = blackCaptured.map(p =>
+        `<span class="captured-piece white-piece">${pieceGlyphs[p]}</span>`
+    ).join('');
+}
+
 // Update timer display
 function updateTimerDisplay() {
     if (!game) return;
 
-    const whiteTime = game.getTimeRemaining('white');
-    const blackTime = game.getTimeRemaining('black');
-
     const whiteTimerEl = document.getElementById('white-timer');
     const blackTimerEl = document.getElementById('black-timer');
+
+    // Handle untimed games
+    if (game.isUntimed()) {
+        whiteTimerEl.textContent = '--:--';
+        blackTimerEl.textContent = '--:--';
+        whiteTimerEl.classList.remove('active', 'low-time', 'expired');
+        blackTimerEl.classList.remove('active', 'low-time', 'expired');
+        return;
+    }
+
+    const whiteTime = game.getTimeRemaining('white');
+    const blackTime = game.getTimeRemaining('black');
 
     whiteTimerEl.textContent = game.formatTime(whiteTime);
     blackTimerEl.textContent = game.formatTime(blackTime);
@@ -846,6 +916,11 @@ function joinTable(gameId) {
     socket.emit('joinGame', { gameId });
 }
 
+// Format time control for display
+function formatTimeControl(timeControl) {
+    return timeControl === 0 ? 'Untimed' : `${timeControl} min`;
+}
+
 // Update lobby display with available games
 function updateLobbyDisplay(games) {
     const tablesList = document.getElementById('tables-list');
@@ -862,7 +937,7 @@ function updateLobbyDisplay(games) {
     tablesList.innerHTML = availableGames.map(game => `
         <div class="table-item">
             <div class="table-info">
-                <span class="table-time">${game.timeControl} min</span>
+                <span class="table-time">${formatTimeControl(game.timeControl)}</span>
                 <span class="table-code">#${game.gameId}</span>
             </div>
             <button class="btn-join-table" onclick="joinTable('${game.gameId}')">Join</button>
