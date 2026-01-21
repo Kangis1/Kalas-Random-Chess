@@ -241,6 +241,7 @@ io.on('connection', (socket) => {
 
         // Broadcast to opponent
         const opponentId = playerColor === 'white' ? gameData.black : gameData.white;
+        console.log(`Move made by ${playerColor} (${socket.id}), sending to opponent ${opponentId}`);
         io.to(opponentId).emit('moveMade', {
             gameState: gameState,
             gameStatus: result.gameStatus

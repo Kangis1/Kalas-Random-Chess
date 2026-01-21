@@ -18,7 +18,6 @@ let aiThinking = false;
 document.addEventListener('DOMContentLoaded', () => {
     initializeSocket();
     initializeEventListeners();
-    checkForActiveGame();
 });
 
 // Check if there's an active game to rejoin after page refresh
@@ -31,8 +30,10 @@ function checkForActiveGame() {
             if (Date.now() - gameData.savedAt < 3600000) {
                 currentGameId = gameData.gameId;
                 playerColor = gameData.playerColor;
-                // Request reconnection from server
-                socket.emit('reconnectGame', { gameId: gameData.gameId });
+                // Small delay to allow server to process disconnect first
+                setTimeout(() => {
+                    socket.emit('reconnectGame', { gameId: gameData.gameId });
+                }, 500);
             } else {
                 // Clear stale game data
                 localStorage.removeItem('activeGame');
@@ -65,6 +66,8 @@ function initializeSocket() {
 
     socket.on('connect', () => {
         console.log('Connected to server');
+        // Check for active game after connection is established
+        checkForActiveGame();
     });
 
     socket.on('disconnect', () => {
@@ -116,6 +119,7 @@ function initializeSocket() {
 
     // Opponent made a move
     socket.on('moveMade', (data) => {
+        console.log('Received moveMade from server:', data);
         if (boardUI && game) {
             const wasCapture = data.gameState.moveHistory.length > 0 &&
                 data.gameState.moveHistory[data.gameState.moveHistory.length - 1].captured;
