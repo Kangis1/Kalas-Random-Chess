@@ -129,7 +129,7 @@ body {
 }
 
 .btn-time {
-    padding: 20px 25px;
+    padding: 20px 15px;
     font-size: 1.2rem;
     background: #2c3e50;
     color: #fff;
@@ -137,7 +137,11 @@ body {
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.2s ease;
-    min-width: 90px;
+    min-width: 80px;
+}
+
+.btn-time[data-time="0"] {
+    font-size: 1rem;
 }
 
 .btn-time:hover {
