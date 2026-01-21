@@ -1,0 +1,676 @@
+// Kalas Random Chess - Main Application
+
+let socket = null;
+let game = null;
+let boardUI = null;
+let currentGameId = null;
+let playerColor = null;
+let isLocalGame = false;
+let isAIGame = false;
+let ai = null;
+let aiDifficulty = 'medium';
+let selectedTimeControl = 10; // Default 10 minutes
+let timerInterval = null;
+let pendingGameType = null; // 'create', 'local', 'ai', or 'join'
+let aiThinking = false;
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', () => {
+    initializeSocket();
+    initializeEventListeners();
+});
+
+// Initialize Socket.io connection
+function initializeSocket() {
+    socket = io();
+
+    socket.on('connect', () => {
+        console.log('Connected to server');
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Disconnected from server');
+    });
+
+    // Game created - waiting for opponent
+    socket.on('gameCreated', (data) => {
+        currentGameId = data.gameId;
+        document.getElementById('game-code-display').textContent = data.gameId;
+        UI.hide('time-control-select');
+        UI.show('waiting-room');
+    });
+
+    // Game joined successfully
+    socket.on('gameJoined', (data) => {
+        currentGameId = data.gameId;
+        playerColor = data.color;
+        Sounds.opponentJoined();
+        startOnlineGame(data.gameState, data.color);
+    });
+
+    // Game started (both players connected)
+    socket.on('gameStart', (data) => {
+        playerColor = data.color;
+        Sounds.opponentJoined();
+        startOnlineGame(data.gameState, data.color);
+    });
+
+    // Opponent made a move
+    socket.on('moveMade', (data) => {
+        if (boardUI && game) {
+            const wasCapture = data.gameState.moveHistory.length > 0 &&
+                data.gameState.moveHistory[data.gameState.moveHistory.length - 1].captured;
+
+            boardUI.updateFromState(data.gameState);
+            UI.updateGameInfo(game);
+            updateTimerDisplay();
+
+            // Play appropriate sound
+            if (data.gameStatus && data.gameStatus.inCheck) {
+                Sounds.check();
+            } else if (wasCapture) {
+                Sounds.capture();
+            } else {
+                Sounds.move();
+            }
+
+            if (data.gameStatus && data.gameStatus.gameOver) {
+                handleGameEnd(data.gameStatus);
+            }
+        }
+    });
+
+    // Timer sync from server
+    socket.on('timerSync', (data) => {
+        if (game) {
+            game.setTime('white', data.whiteTime);
+            game.setTime('black', data.blackTime);
+            updateTimerDisplay();
+        }
+    });
+
+    // Timeout notification from server
+    socket.on('timeout', (data) => {
+        if (game) {
+            Sounds.timeout();
+            handleGameEnd(data);
+        }
+    });
+
+    // Opponent resigned
+    socket.on('opponentResigned', (data) => {
+        if (game) {
+            game.gameOver = true;
+            game.winner = playerColor;
+            stopTimerInterval();
+            Sounds.victory();
+            handleGameEnd({
+                gameOver: true,
+                result: 'resignation',
+                winner: playerColor,
+                message: `Opponent resigned. You win!`
+            });
+        }
+    });
+
+    // Opponent disconnected
+    socket.on('opponentDisconnected', () => {
+        UI.notify('Opponent disconnected');
+        if (game && !game.gameOver) {
+            stopTimerInterval();
+            Sounds.victory();
+            handleGameEnd({
+                gameOver: true,
+                result: 'disconnect',
+                winner: playerColor,
+                message: 'Opponent disconnected. You win!'
+            });
+        }
+    });
+
+    // Error handling
+    socket.on('error', (data) => {
+        Sounds.invalid();
+        alert(data.message);
+        UI.hide('waiting-room');
+        UI.hide('join-form');
+        UI.hide('time-control-select');
+        UI.hide('ai-difficulty-select');
+    });
+}
+
+// Initialize UI event listeners
+function initializeEventListeners() {
+    // Menu buttons
+    document.getElementById('btn-vs-computer').addEventListener('click', showDifficultySelect);
+    document.getElementById('btn-create-game').addEventListener('click', () => showTimeControl('create'));
+    document.getElementById('btn-join-game').addEventListener('click', showJoinForm);
+    document.getElementById('btn-local-game').addEventListener('click', () => showTimeControl('local'));
+    document.getElementById('btn-rules').addEventListener('click', showRules);
+
+    // AI Difficulty selection
+    document.querySelectorAll('.btn-difficulty').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const button = e.target.closest('.btn-difficulty');
+            aiDifficulty = button.dataset.difficulty;
+            showTimeControl('ai');
+        });
+    });
+    document.getElementById('btn-cancel-difficulty').addEventListener('click', hideDifficultySelect);
+
+    // Time control selection
+    document.querySelectorAll('.btn-time').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            selectedTimeControl = parseInt(e.target.dataset.time);
+            document.querySelectorAll('.btn-time').forEach(b => b.classList.remove('selected'));
+            e.target.classList.add('selected');
+            confirmTimeControl();
+        });
+    });
+    document.getElementById('btn-cancel-time').addEventListener('click', hideTimeControl);
+
+    // Join form
+    document.getElementById('btn-submit-join').addEventListener('click', joinGame);
+    document.getElementById('btn-cancel-join').addEventListener('click', hideJoinForm);
+    document.getElementById('game-code-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') joinGame();
+    });
+
+    // Waiting room
+    document.getElementById('btn-cancel-waiting').addEventListener('click', cancelWaiting);
+
+    // Rules screen
+    document.getElementById('btn-back-rules').addEventListener('click', () => {
+        UI.showScreen('menu-screen');
+    });
+
+    // Game controls
+    document.getElementById('btn-resign').addEventListener('click', resignGame);
+    document.getElementById('btn-new-game').addEventListener('click', returnToMenu);
+}
+
+// Show AI difficulty selection
+function showDifficultySelect() {
+    UI.hide('join-form');
+    UI.hide('waiting-room');
+    UI.hide('time-control-select');
+    UI.show('ai-difficulty-select');
+}
+
+// Hide AI difficulty selection
+function hideDifficultySelect() {
+    UI.hide('ai-difficulty-select');
+}
+
+// Show time control selection
+function showTimeControl(gameType) {
+    pendingGameType = gameType;
+    UI.hide('join-form');
+    UI.hide('waiting-room');
+    UI.hide('ai-difficulty-select');
+    UI.show('time-control-select');
+    // Reset selection highlight
+    document.querySelectorAll('.btn-time').forEach(b => b.classList.remove('selected'));
+}
+
+// Hide time control selection
+function hideTimeControl() {
+    UI.hide('time-control-select');
+    pendingGameType = null;
+}
+
+// Confirm time control and proceed
+function confirmTimeControl() {
+    if (pendingGameType === 'create') {
+        createOnlineGame();
+    } else if (pendingGameType === 'local') {
+        startLocalGame();
+    } else if (pendingGameType === 'ai') {
+        startAIGame();
+    }
+}
+
+// Create online game
+function createOnlineGame() {
+    socket.emit('createGame', { timeControl: selectedTimeControl });
+}
+
+// Show join form
+function showJoinForm() {
+    UI.hide('time-control-select');
+    UI.hide('ai-difficulty-select');
+    UI.show('join-form');
+    document.getElementById('game-code-input').value = '';
+    document.getElementById('game-code-input').focus();
+}
+
+// Hide join form
+function hideJoinForm() {
+    UI.hide('join-form');
+}
+
+// Join existing game
+function joinGame() {
+    const gameId = document.getElementById('game-code-input').value.trim().toUpperCase();
+    if (gameId.length === 6) {
+        socket.emit('joinGame', { gameId });
+    } else {
+        Sounds.invalid();
+        alert('Please enter a valid 6-character game code');
+    }
+}
+
+// Cancel waiting for opponent
+function cancelWaiting() {
+    if (currentGameId) {
+        socket.emit('cancelGame', { gameId: currentGameId });
+    }
+    currentGameId = null;
+    UI.hide('waiting-room');
+}
+
+// Start AI game
+function startAIGame() {
+    isLocalGame = false;
+    isAIGame = true;
+    playerColor = 'white'; // Player is always white against AI
+
+    // Initialize AI
+    ai = new ChessAI(aiDifficulty);
+
+    game = new KalasRandomChess(selectedTimeControl);
+    game.generateStartingPosition();
+
+    const boardElement = document.getElementById('chess-board');
+    boardUI = new ChessBoardUI(boardElement, game);
+    boardUI.setPlayerColor('white');
+
+    boardUI.onMove((result) => {
+        // Play sound based on move type
+        if (result.gameStatus && result.gameStatus.inCheck) {
+            Sounds.check();
+        } else if (result.move.captured) {
+            Sounds.capture();
+        } else {
+            Sounds.move();
+        }
+
+        UI.updateGameInfo(game);
+        updateTimerDisplay();
+
+        if (result.gameStatus && result.gameStatus.gameOver) {
+            handleGameEnd(result.gameStatus);
+        } else {
+            // AI's turn
+            makeAIMove();
+        }
+    });
+
+    boardUI.onSelect(() => {
+        Sounds.select();
+    });
+
+    boardUI.render();
+    UI.updateGameInfo(game);
+    UI.hideGameMessage();
+    UI.hide('time-control-select');
+    UI.hide('ai-difficulty-select');
+    UI.showScreen('game-screen');
+
+    // Update player status indicators
+    const difficultyLabel = aiDifficulty.charAt(0).toUpperCase() + aiDifficulty.slice(1);
+    document.getElementById('white-status').textContent = '(You)';
+    document.getElementById('black-status').textContent = `(AI - ${difficultyLabel})`;
+
+    // Initialize timers
+    updateTimerDisplay();
+    game.startTimer();
+    startTimerInterval();
+
+    Sounds.gameStart();
+}
+
+// Make AI move
+async function makeAIMove() {
+    if (!game || game.gameOver || !isAIGame || game.currentTurn !== 'black') {
+        return;
+    }
+
+    aiThinking = true;
+    UI.showAIThinking(true);
+
+    try {
+        // Add a small delay based on difficulty for UX
+        const minDelay = aiDifficulty === 'easy' ? 300 : aiDifficulty === 'medium' ? 500 : 800;
+        const move = await ai.findBestMoveAsync(game, minDelay);
+
+        if (move && !game.gameOver) {
+            const result = game.makeMove(move.from, move.to);
+
+            if (result.success) {
+                boardUI.render();
+
+                // Play sound
+                if (result.gameStatus && result.gameStatus.inCheck) {
+                    Sounds.check();
+                } else if (result.move.captured) {
+                    Sounds.capture();
+                } else {
+                    Sounds.move();
+                }
+
+                UI.updateGameInfo(game);
+                updateTimerDisplay();
+
+                if (result.gameStatus && result.gameStatus.gameOver) {
+                    handleGameEnd(result.gameStatus);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('AI error:', error);
+    }
+
+    aiThinking = false;
+    UI.showAIThinking(false);
+}
+
+// Start local game (2 players same device)
+function startLocalGame() {
+    isLocalGame = true;
+    isAIGame = false;
+    playerColor = null;
+    ai = null;
+
+    game = new KalasRandomChess(selectedTimeControl);
+    game.generateStartingPosition();
+
+    const boardElement = document.getElementById('chess-board');
+    boardUI = new ChessBoardUI(boardElement, game);
+    boardUI.playerColor = null; // Local game - both colors can play
+
+    boardUI.onMove((result) => {
+        // Play sound based on move type
+        if (result.gameStatus && result.gameStatus.inCheck) {
+            Sounds.check();
+        } else if (result.move.captured) {
+            Sounds.capture();
+        } else {
+            Sounds.move();
+        }
+
+        UI.updateGameInfo(game);
+
+        if (result.gameStatus && result.gameStatus.gameOver) {
+            handleGameEnd(result.gameStatus);
+        }
+    });
+
+    boardUI.onSelect(() => {
+        Sounds.select();
+    });
+
+    boardUI.render();
+    UI.updateGameInfo(game);
+    UI.hideGameMessage();
+    UI.hide('time-control-select');
+    UI.showScreen('game-screen');
+
+    // Update player status indicators
+    document.getElementById('white-status').textContent = '(Player 1)';
+    document.getElementById('black-status').textContent = '(Player 2)';
+
+    // Initialize timers
+    updateTimerDisplay();
+    game.startTimer();
+    startTimerInterval();
+
+    Sounds.gameStart();
+}
+
+// Start online game
+function startOnlineGame(gameState, color) {
+    isLocalGame = false;
+    isAIGame = false;
+    playerColor = color;
+    ai = null;
+
+    game = new KalasRandomChess(gameState.timeControl || 10);
+    game.loadState(gameState);
+
+    const boardElement = document.getElementById('chess-board');
+    boardUI = new ChessBoardUI(boardElement, game);
+    boardUI.setPlayerColor(color);
+
+    boardUI.onMove((result) => {
+        // Play sound based on move type
+        if (result.gameStatus && result.gameStatus.inCheck) {
+            Sounds.check();
+        } else if (result.move.captured) {
+            Sounds.capture();
+        } else {
+            Sounds.move();
+        }
+
+        // Send move to server
+        socket.emit('makeMove', {
+            gameId: currentGameId,
+            move: {
+                from: result.move.from,
+                to: result.move.to
+            }
+        });
+
+        UI.updateGameInfo(game);
+
+        if (result.gameStatus && result.gameStatus.gameOver) {
+            handleGameEnd(result.gameStatus);
+        }
+    });
+
+    boardUI.onSelect(() => {
+        Sounds.select();
+    });
+
+    UI.updateGameInfo(game);
+    UI.hideGameMessage();
+    UI.hide('time-control-select');
+    UI.hide('waiting-room');
+    UI.showScreen('game-screen');
+
+    // Update player status indicators
+    document.getElementById('white-status').textContent = color === 'white' ? '(You)' : '(Opponent)';
+    document.getElementById('black-status').textContent = color === 'black' ? '(You)' : '(Opponent)';
+
+    // Initialize timers
+    updateTimerDisplay();
+    game.startTimer();
+    startTimerInterval();
+
+    Sounds.gameStart();
+}
+
+// Timer interval management
+function startTimerInterval() {
+    stopTimerInterval(); // Clear any existing interval
+
+    timerInterval = setInterval(() => {
+        if (!game || game.gameOver) {
+            stopTimerInterval();
+            return;
+        }
+
+        // Don't tick AI's clock while it's thinking (optional fairness)
+        if (isAIGame && aiThinking && game.currentTurn === 'black') {
+            // Still update display but don't deduct time
+            updateTimerDisplay();
+            return;
+        }
+
+        game.updateTime();
+        updateTimerDisplay();
+
+        // Check for timeout
+        const timeout = game.checkTimeout();
+        if (timeout) {
+            stopTimerInterval();
+            Sounds.timeout();
+            handleGameEnd(timeout);
+
+            // Notify server in online games
+            if (!isLocalGame && !isAIGame && currentGameId) {
+                socket.emit('timeout', { gameId: currentGameId });
+            }
+            return;
+        }
+
+        // Low time warning sounds (only for player's turn in AI games)
+        const currentTurn = game.currentTurn;
+        if (isAIGame && currentTurn === 'black') return; // No warnings for AI
+
+        const currentTime = game.getTimeRemaining(currentTurn);
+        if (currentTime <= 10000 && currentTime > 0) {
+            // Last 10 seconds - tick sound
+            if (currentTime % 1000 < 100) {
+                Sounds.tick();
+            }
+        } else if (currentTime <= 30000 && currentTime > 10000) {
+            // Under 30 seconds warning
+            if (currentTime % 10000 < 100) {
+                Sounds.lowTime();
+            }
+        }
+    }, 100); // Update every 100ms for smooth countdown
+}
+
+function stopTimerInterval() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+}
+
+// Update timer display
+function updateTimerDisplay() {
+    if (!game) return;
+
+    const whiteTime = game.getTimeRemaining('white');
+    const blackTime = game.getTimeRemaining('black');
+
+    const whiteTimerEl = document.getElementById('white-timer');
+    const blackTimerEl = document.getElementById('black-timer');
+
+    whiteTimerEl.textContent = game.formatTime(whiteTime);
+    blackTimerEl.textContent = game.formatTime(blackTime);
+
+    // Update active timer styling
+    whiteTimerEl.classList.toggle('active', game.currentTurn === 'white' && !game.gameOver);
+    blackTimerEl.classList.toggle('active', game.currentTurn === 'black' && !game.gameOver);
+
+    // Low time warning styling
+    whiteTimerEl.classList.toggle('low-time', whiteTime <= 30000 && whiteTime > 0);
+    blackTimerEl.classList.toggle('low-time', blackTime <= 30000 && blackTime > 0);
+
+    // Expired styling
+    whiteTimerEl.classList.toggle('expired', whiteTime <= 0);
+    blackTimerEl.classList.toggle('expired', blackTime <= 0);
+}
+
+// Show rules screen
+function showRules() {
+    UI.showScreen('rules-screen');
+}
+
+// Handle game end
+function handleGameEnd(status) {
+    stopTimerInterval();
+    aiThinking = false;
+    UI.showAIThinking(false);
+
+    let title, subtitle;
+    let isVictory = false;
+
+    switch (status.result) {
+        case 'checkmate':
+            title = 'Checkmate!';
+            subtitle = `${status.winner.charAt(0).toUpperCase() + status.winner.slice(1)} wins!`;
+            isVictory = (isLocalGame || status.winner === playerColor);
+            break;
+        case 'stalemate':
+            title = 'Stalemate!';
+            subtitle = 'The game is a draw.';
+            break;
+        case 'resignation':
+            title = 'Resignation';
+            subtitle = status.message;
+            isVictory = (status.winner === playerColor);
+            break;
+        case 'disconnect':
+            title = 'Opponent Disconnected';
+            subtitle = 'You win by default!';
+            isVictory = true;
+            break;
+        case 'timeout':
+            title = 'Time Out!';
+            subtitle = status.message;
+            isVictory = (status.winner === playerColor);
+            break;
+        default:
+            title = 'Game Over';
+            subtitle = status.message || '';
+    }
+
+    // Play appropriate sound (if not already played)
+    if (status.result === 'checkmate' || status.result === 'stalemate') {
+        if (isVictory) {
+            Sounds.victory();
+        } else {
+            Sounds.gameOver();
+        }
+    }
+
+    UI.showGameMessage(title, subtitle);
+}
+
+// Resign game
+function resignGame() {
+    if (!game || game.gameOver) return;
+
+    if (confirm('Are you sure you want to resign?')) {
+        stopTimerInterval();
+        Sounds.gameOver();
+
+        if (isLocalGame || isAIGame) {
+            const result = game.resign(isAIGame ? 'white' : game.currentTurn);
+            boardUI.render();
+            handleGameEnd(result);
+        } else {
+            socket.emit('resign', { gameId: currentGameId });
+            const result = game.resign(playerColor);
+            boardUI.render();
+            handleGameEnd(result);
+        }
+    }
+}
+
+// Return to menu
+function returnToMenu() {
+    stopTimerInterval();
+    currentGameId = null;
+    playerColor = null;
+    game = null;
+    boardUI = null;
+    isLocalGame = false;
+    isAIGame = false;
+    ai = null;
+    aiThinking = false;
+    pendingGameType = null;
+
+    UI.hide('waiting-room');
+    UI.hide('join-form');
+    UI.hide('time-control-select');
+    UI.hide('ai-difficulty-select');
+    UI.hideGameMessage();
+    UI.showAIThinking(false);
+    UI.showScreen('menu-screen');
+}
