@@ -22,6 +22,26 @@ const games = new Map();
 const playerGames = new Map(); // socket.id -> gameId
 const timerIntervals = new Map(); // gameId -> interval
 
+// Get list of waiting games for lobby
+function getWaitingGames() {
+    const waitingGames = [];
+    for (const [gameId, gameData] of games.entries()) {
+        if (gameData.state === 'waiting') {
+            waitingGames.push({
+                gameId,
+                timeControl: gameData.timeControl,
+                createdAt: gameData.createdAt || Date.now()
+            });
+        }
+    }
+    return waitingGames;
+}
+
+// Broadcast lobby update to all connected clients
+function broadcastLobbyUpdate() {
+    io.emit('lobbyUpdate', { games: getWaitingGames() });
+}
+
 // Generate random 6-character game code
 function generateGameCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude confusing characters
@@ -85,6 +105,14 @@ function stopGameTimer(gameId) {
 io.on('connection', (socket) => {
     console.log(`Player connected: ${socket.id}`);
 
+    // Send current lobby state when client connects
+    socket.emit('lobbyUpdate', { games: getWaitingGames() });
+
+    // Client requests lobby update
+    socket.on('getLobby', () => {
+        socket.emit('lobbyUpdate', { games: getWaitingGames() });
+    });
+
     // Create a new game
     socket.on('createGame', (data) => {
         const timeControl = data?.timeControl || 10; // Default 10 minutes
@@ -97,13 +125,15 @@ io.on('connection', (socket) => {
             white: socket.id,
             black: null,
             state: 'waiting', // waiting, playing, finished
-            timeControl: timeControl
+            timeControl: timeControl,
+            createdAt: Date.now()
         });
 
         playerGames.set(socket.id, gameId);
         socket.join(gameId);
 
         socket.emit('gameCreated', { gameId, timeControl });
+        broadcastLobbyUpdate(); // Notify all clients about new game
         console.log(`Game created: ${gameId} by ${socket.id} (${timeControl} min)`);
     });
 
@@ -162,6 +192,7 @@ io.on('connection', (socket) => {
             gameState
         });
 
+        broadcastLobbyUpdate(); // Game is no longer waiting
         console.log(`Player ${socket.id} joined game ${gameId}`);
     });
 
@@ -263,6 +294,7 @@ io.on('connection', (socket) => {
             games.delete(gameId);
             playerGames.delete(socket.id);
             socket.leave(gameId);
+            broadcastLobbyUpdate(); // Game removed from lobby
             console.log(`Game cancelled: ${gameId}`);
         }
     });
@@ -279,6 +311,7 @@ io.on('connection', (socket) => {
                 if (gameData.state === 'waiting') {
                     // Delete waiting game
                     games.delete(gameId);
+                    broadcastLobbyUpdate(); // Game removed from lobby
                 } else if (gameData.state === 'playing') {
                     // Stop timer and notify opponent
                     stopGameTimer(gameId);

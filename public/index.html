@@ -15,8 +15,7 @@
 
             <div class="menu-buttons">
                 <button id="btn-vs-computer" class="btn btn-primary">Play vs Computer</button>
-                <button id="btn-create-game" class="btn btn-secondary">Create Online Game</button>
-                <button id="btn-join-game" class="btn btn-secondary">Join Online Game</button>
+                <button id="btn-play-online" class="btn btn-secondary">Play Online</button>
                 <button id="btn-local-game" class="btn btn-secondary">Local Game (2 Players)</button>
                 <button id="btn-rules" class="btn btn-text">View Rules</button>
             </div>
@@ -66,6 +65,37 @@
                 <div class="game-code" id="game-code-display"></div>
                 <p class="waiting-text">Waiting for opponent...</p>
                 <button id="btn-cancel-waiting" class="btn btn-text">Cancel</button>
+            </div>
+
+            <!-- Online Lobby -->
+            <div id="online-lobby" class="hidden">
+                <h3>Online Lobby</h3>
+                <div class="lobby-actions">
+                    <button id="btn-create-table" class="btn btn-primary">Create Table</button>
+                    <div class="join-code-section">
+                        <input type="text" id="lobby-code-input" placeholder="Code" maxlength="6">
+                        <button id="btn-join-code" class="btn btn-secondary">Join by Code</button>
+                    </div>
+                </div>
+                <div class="lobby-tables">
+                    <h4>Available Tables</h4>
+                    <div id="tables-list" class="tables-list">
+                        <p class="no-tables">No tables available. Create one!</p>
+                    </div>
+                </div>
+                <button id="btn-back-lobby" class="btn btn-text">Back to Menu</button>
+            </div>
+
+            <!-- Time Control for Creating Table -->
+            <div id="create-table-form" class="hidden">
+                <h3>Create Table</h3>
+                <p>Select time control:</p>
+                <div class="time-options">
+                    <button class="btn btn-time btn-table-time" data-time="5">5 min</button>
+                    <button class="btn btn-time btn-table-time" data-time="10">10 min</button>
+                    <button class="btn btn-time btn-table-time" data-time="15">15 min</button>
+                </div>
+                <button id="btn-cancel-create-table" class="btn btn-text">Cancel</button>
             </div>
         </div>
 

@@ -136,6 +136,12 @@ function initializeSocket() {
         UI.hide('join-form');
         UI.hide('time-control-select');
         UI.hide('ai-difficulty-select');
+        UI.hide('create-table-form');
+    });
+
+    // Lobby updates
+    socket.on('lobbyUpdate', (data) => {
+        updateLobbyDisplay(data.games);
     });
 }
 
@@ -143,8 +149,7 @@ function initializeSocket() {
 function initializeEventListeners() {
     // Menu buttons
     document.getElementById('btn-vs-computer').addEventListener('click', showDifficultySelect);
-    document.getElementById('btn-create-game').addEventListener('click', () => showTimeControl('create'));
-    document.getElementById('btn-join-game').addEventListener('click', showJoinForm);
+    document.getElementById('btn-play-online').addEventListener('click', showOnlineLobby);
     document.getElementById('btn-local-game').addEventListener('click', () => showTimeControl('local'));
     document.getElementById('btn-rules').addEventListener('click', showRules);
 
@@ -178,6 +183,23 @@ function initializeEventListeners() {
 
     // Waiting room
     document.getElementById('btn-cancel-waiting').addEventListener('click', cancelWaiting);
+
+    // Online lobby
+    document.getElementById('btn-create-table').addEventListener('click', showCreateTableForm);
+    document.getElementById('btn-join-code').addEventListener('click', joinByCode);
+    document.getElementById('btn-back-lobby').addEventListener('click', hideOnlineLobby);
+    document.getElementById('lobby-code-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') joinByCode();
+    });
+
+    // Create table form
+    document.querySelectorAll('.btn-table-time').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            selectedTimeControl = parseInt(e.target.dataset.time);
+            createTableAndJoinLobby();
+        });
+    });
+    document.getElementById('btn-cancel-create-table').addEventListener('click', hideCreateTableForm);
 
     // Rules screen
     document.getElementById('btn-back-rules').addEventListener('click', () => {
@@ -670,7 +692,86 @@ function returnToMenu() {
     UI.hide('join-form');
     UI.hide('time-control-select');
     UI.hide('ai-difficulty-select');
+    UI.hide('online-lobby');
+    UI.hide('create-table-form');
     UI.hideGameMessage();
     UI.showAIThinking(false);
     UI.showScreen('menu-screen');
+}
+
+// Show online lobby
+function showOnlineLobby() {
+    UI.hide('time-control-select');
+    UI.hide('ai-difficulty-select');
+    UI.hide('join-form');
+    UI.hide('waiting-room');
+    UI.hide('create-table-form');
+    UI.show('online-lobby');
+    // Request fresh lobby data
+    socket.emit('getLobby');
+}
+
+// Hide online lobby
+function hideOnlineLobby() {
+    UI.hide('online-lobby');
+    UI.hide('create-table-form');
+}
+
+// Show create table form
+function showCreateTableForm() {
+    UI.hide('online-lobby');
+    UI.show('create-table-form');
+}
+
+// Hide create table form
+function hideCreateTableForm() {
+    UI.hide('create-table-form');
+    UI.show('online-lobby');
+}
+
+// Create table and show in lobby
+function createTableAndJoinLobby() {
+    socket.emit('createGame', { timeControl: selectedTimeControl });
+    UI.hide('create-table-form');
+    UI.hide('online-lobby');
+}
+
+// Join game by code from lobby
+function joinByCode() {
+    const gameId = document.getElementById('lobby-code-input').value.trim().toUpperCase();
+    if (gameId.length === 6) {
+        socket.emit('joinGame', { gameId });
+    } else {
+        Sounds.invalid();
+        alert('Please enter a valid 6-character game code');
+    }
+}
+
+// Join a table from lobby
+function joinTable(gameId) {
+    socket.emit('joinGame', { gameId });
+}
+
+// Update lobby display with available games
+function updateLobbyDisplay(games) {
+    const tablesList = document.getElementById('tables-list');
+    if (!tablesList) return;
+
+    // Filter out our own game if we're waiting
+    const availableGames = games.filter(g => g.gameId !== currentGameId);
+
+    if (availableGames.length === 0) {
+        tablesList.innerHTML = '<p class="no-tables">No tables available. Create one!</p>';
+        return;
+    }
+
+    tablesList.innerHTML = availableGames.map(game => `
+        <div class="table-item">
+            <div class="table-info">
+                <span class="table-time">${game.timeControl} min</span>
+                <span class="table-code">#${game.gameId}</span>
+            </div>
+            <button class="btn-join-table" onclick="joinTable('${game.gameId}')">Join</button>
+        </div>
+    `).join('');
 }
