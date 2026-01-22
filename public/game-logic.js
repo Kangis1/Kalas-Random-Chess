@@ -16,11 +16,12 @@ const PIECES = {
     BLACK_PAWN: 'p'
 };
 
-// Map internal markers to display glyphs
-// Both use outline glyphs for consistent sizing on mobile
+// Map internal markers to display glyphs (all filled/solid)
+// Using text variation selector (U+FE0E) to prevent emoji rendering on iOS
+const VS15 = '\uFE0E';
 const PIECE_GLYPHS = {
-    'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
-    'k': '♔', 'q': '♕', 'r': '♖', 'b': '♗', 'n': '♘', 'p': '♙'
+    'K': '♚' + VS15, 'Q': '♛' + VS15, 'R': '♜' + VS15, 'B': '♝' + VS15, 'N': '♞' + VS15, 'P': '♟' + VS15,
+    'k': '♚' + VS15, 'q': '♛' + VS15, 'r': '♜' + VS15, 'b': '♝' + VS15, 'n': '♞' + VS15, 'p': '♟' + VS15
 };
 
 const PIECE_VALUES = {
@@ -129,9 +130,9 @@ class KalasRandomChess {
         // Black king: spaces #57-64 (indices 56-63, rank 8)
         let blackKingZone = [56, 57, 58, 59, 60, 61, 62, 63];
 
-        // Black pawns: spaces #25-56 (indices 24-55, ranks 4-7)
+        // Black pawns: ranks 5-7 (indices 32-55)
         let blackPawnZone = [];
-        for (let i = 24; i <= 55; i++) blackPawnZone.push(i);
+        for (let i = 32; i <= 55; i++) blackPawnZone.push(i);
 
         // Black pieces: spaces #41-64 (indices 40-63, ranks 6-8) - remaining after king
         let blackPieceZone = [];

@@ -694,10 +694,11 @@ function stopTimerInterval() {
 function updateCapturedPieces() {
     if (!game) return;
 
-    // Piece glyphs mapping - both use outline for consistent sizing
+    // Piece glyphs mapping (all filled/solid with text variation selector)
+    const VS15 = '\uFE0E';
     const pieceGlyphs = {
-        'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
-        'k': '♔', 'q': '♕', 'r': '♖', 'b': '♗', 'n': '♘', 'p': '♙'
+        'K': '♚' + VS15, 'Q': '♛' + VS15, 'R': '♜' + VS15, 'B': '♝' + VS15, 'N': '♞' + VS15, 'P': '♟' + VS15,
+        'k': '♚' + VS15, 'q': '♛' + VS15, 'r': '♜' + VS15, 'b': '♝' + VS15, 'n': '♞' + VS15, 'p': '♟' + VS15
     };
 
     // Piece order for sorting (queen first, then rooks, bishops, knights, pawns)
