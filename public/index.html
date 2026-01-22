@@ -8,10 +8,75 @@
 </head>
 <body>
     <div id="app">
+        <!-- Auth Modal -->
+        <div id="auth-modal" class="modal hidden">
+            <div class="modal-content auth-modal">
+                <button class="modal-close" id="auth-close">&times;</button>
+                <div id="auth-tabs">
+                    <button class="auth-tab active" data-tab="login">Login</button>
+                    <button class="auth-tab" data-tab="signup">Sign Up</button>
+                </div>
+
+                <!-- Login Form -->
+                <form id="login-form" class="auth-form">
+                    <div class="form-group">
+                        <label for="login-email">Email</label>
+                        <input type="email" id="login-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" required>
+                    </div>
+                    <div id="login-error" class="auth-error hidden"></div>
+                    <button type="submit" class="btn btn-primary btn-full">Login</button>
+                </form>
+
+                <!-- Signup Form -->
+                <form id="signup-form" class="auth-form hidden">
+                    <div class="form-group">
+                        <label for="signup-email">Email</label>
+                        <input type="email" id="signup-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signup-username">Username (optional)</label>
+                        <input type="text" id="signup-username" maxlength="20">
+                    </div>
+                    <div class="form-group">
+                        <label for="signup-password">Password</label>
+                        <input type="password" id="signup-password" minlength="6" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signup-confirm">Confirm Password</label>
+                        <input type="password" id="signup-confirm" required>
+                    </div>
+                    <div id="signup-error" class="auth-error hidden"></div>
+                    <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Email Verification Banner -->
+        <div id="verify-banner" class="verify-banner hidden">
+            <span>Please verify your email to save game history.</span>
+            <button id="btn-resend-verify" class="btn btn-small">Resend Email</button>
+        </div>
+
         <!-- Landing/Menu Screen -->
         <div id="menu-screen" class="screen active">
+            <!-- User Info (shown when logged in) -->
+            <div id="user-info" class="user-info hidden">
+                <span id="user-display-name">Guest</span>
+                <button id="btn-logout" class="btn btn-small">Logout</button>
+            </div>
+
             <h1>Kalas Random Chess</h1>
             <p class="subtitle">A chess variant with randomized starting positions</p>
+
+            <!-- Auth buttons (shown when logged out) -->
+            <div id="auth-buttons" class="auth-buttons">
+                <button id="btn-login" class="btn btn-small">Login</button>
+                <button id="btn-signup" class="btn btn-small btn-secondary">Sign Up</button>
+            </div>
 
             <div class="menu-buttons">
                 <button id="btn-vs-computer" class="btn btn-primary">Play vs Computer</button>
@@ -181,6 +246,7 @@
     <script src="ai.js"></script>
     <script src="sounds.js"></script>
     <script src="ui.js"></script>
+    <script src="auth-client.js"></script>
     <script src="main.js"></script>
 </body>
 </html>

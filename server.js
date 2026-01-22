@@ -8,14 +8,29 @@ const path = require('path');
 // Import game logic (for server-side validation)
 const { KalasRandomChess } = require('./public/game-logic.js');
 
+// Import auth and database
+const { pool, initializeDatabase } = require('./db');
+const authRouter = require('./auth');
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
+// Middleware
+app.use(express.json());
+
+// Auth routes
+app.use('/auth', authRouter);
+
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Email verification redirect (serves the app which handles verification)
+app.get('/verify', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // Game storage
 const games = new Map();
@@ -434,7 +449,12 @@ setInterval(() => {
 }, 30 * 60 * 1000);
 
 // Start server
-server.listen(PORT, () => {
-    console.log(`Kalas Random Chess server running on port ${PORT}`);
-    console.log(`Open http://localhost:${PORT} in your browser`);
-});
+async function startServer() {
+    await initializeDatabase();
+    server.listen(PORT, () => {
+        console.log(`Kalas Random Chess server running on port ${PORT}`);
+        console.log(`Open http://localhost:${PORT} in your browser`);
+    });
+}
+
+startServer();
