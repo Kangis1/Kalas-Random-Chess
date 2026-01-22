@@ -16,9 +16,10 @@ const PIECES = {
     BLACK_PAWN: 'p'
 };
 
-// Map internal markers to display glyphs (all filled/solid)
+// Map internal markers to display glyphs
+// White uses outline glyphs, Black uses filled glyphs
 const PIECE_GLYPHS = {
-    'K': '♚', 'Q': '♛', 'R': '♜', 'B': '♝', 'N': '♞', 'P': '♟',
+    'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
     'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'
 };
 

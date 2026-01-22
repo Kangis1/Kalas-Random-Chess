@@ -694,10 +694,10 @@ function stopTimerInterval() {
 function updateCapturedPieces() {
     if (!game) return;
 
-    // Piece glyphs mapping
+    // Piece glyphs mapping - white uses outline, black uses filled
     const pieceGlyphs = {
-        'K': '\u265A', 'Q': '\u265B', 'R': '\u265C', 'B': '\u265D', 'N': '\u265E', 'P': '\u265F',
-        'k': '\u265A', 'q': '\u265B', 'r': '\u265C', 'b': '\u265D', 'n': '\u265E', 'p': '\u265F'
+        'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
+        'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'
     };
 
     // Piece order for sorting (queen first, then rooks, bishops, knights, pawns)
