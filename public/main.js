@@ -609,6 +609,18 @@ function startOnlineGame(gameState, color) {
     document.getElementById('white-status').textContent = color === 'white' ? '(You)' : '(Opponent)';
     document.getElementById('black-status').textContent = color === 'black' ? '(You)' : '(Opponent)';
 
+    // Reorder header to match board perspective (opponent on left/top, you on right/bottom)
+    const header = document.querySelector('.game-header');
+    const blackInfo = document.querySelector('.player-black');
+    const whiteInfo = document.querySelector('.player-white');
+    if (color === 'white') {
+        // White player: Black (opponent) should be first
+        header.insertBefore(blackInfo, whiteInfo);
+    } else {
+        // Black player: White (opponent) should be first
+        header.insertBefore(whiteInfo, blackInfo);
+    }
+
     // Initialize timers and captured pieces
     updateTimerDisplay();
     updateCapturedPieces();
