@@ -572,6 +572,8 @@ body {
 .piece {
     user-select: none;
     pointer-events: none;
+    font-family: "Segoe UI Symbol", "Noto Sans Symbols", "Apple Symbols", sans-serif;
+    text-rendering: optimizeLegibility;
 }
 
 /* White pieces - solid violet */

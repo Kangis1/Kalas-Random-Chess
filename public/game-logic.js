@@ -17,10 +17,10 @@ const PIECES = {
 };
 
 // Map internal markers to display glyphs
-// White uses outline glyphs, Black uses filled glyphs
+// Both use outline glyphs for consistent sizing on mobile
 const PIECE_GLYPHS = {
     'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
-    'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'
+    'k': '♔', 'q': '♕', 'r': '♖', 'b': '♗', 'n': '♘', 'p': '♙'
 };
 
 const PIECE_VALUES = {
