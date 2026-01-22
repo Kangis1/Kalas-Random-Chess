@@ -308,6 +308,7 @@ function initializeEventListeners() {
 
 // Show AI difficulty selection
 function showDifficultySelect() {
+    if (!Auth.requireLogin()) return;
     UI.hide('join-form');
     UI.hide('waiting-room');
     UI.hide('time-control-select');
@@ -321,6 +322,7 @@ function hideDifficultySelect() {
 
 // Show time control selection
 function showTimeControl(gameType) {
+    if (!Auth.requireLogin()) return;
     pendingGameType = gameType;
     UI.hide('join-form');
     UI.hide('waiting-room');
@@ -882,6 +884,7 @@ function returnToMenu() {
 
 // Show online lobby
 function showOnlineLobby() {
+    if (!Auth.requireLogin()) return;
     UI.hide('time-control-select');
     UI.hide('ai-difficulty-select');
     UI.hide('join-form');

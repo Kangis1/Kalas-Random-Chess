@@ -160,10 +160,16 @@ const Auth = {
     async handleSignup(e) {
         e.preventDefault();
         const email = document.getElementById('signup-email').value;
-        const username = document.getElementById('signup-username').value;
+        const username = document.getElementById('signup-username').value.trim();
         const password = document.getElementById('signup-password').value;
         const confirm = document.getElementById('signup-confirm').value;
         const errorEl = document.getElementById('signup-error');
+
+        if (!username || username.length < 3) {
+            errorEl.textContent = 'Username is required (minimum 3 characters)';
+            errorEl.classList.remove('hidden');
+            return;
+        }
 
         if (password !== confirm) {
             errorEl.textContent = 'Passwords do not match';
@@ -257,6 +263,20 @@ const Auth = {
     // Get auth header for API calls
     getAuthHeader() {
         return this.token ? { 'Authorization': `Bearer ${this.token}` } : {};
+    },
+
+    // Check if user is logged in
+    isLoggedIn() {
+        return this.currentUser !== null;
+    },
+
+    // Require login - returns true if logged in, otherwise opens modal
+    requireLogin() {
+        if (this.isLoggedIn()) {
+            return true;
+        }
+        this.openModal('login');
+        return false;
     }
 };
 
