@@ -20,8 +20,8 @@
                 <!-- Login Form -->
                 <form id="login-form" class="auth-form">
                     <div class="form-group">
-                        <label for="login-email">Email</label>
-                        <input type="email" id="login-email" required>
+                        <label for="login-username">Username</label>
+                        <input type="text" id="login-username" required>
                     </div>
                     <div class="form-group">
                         <label for="login-password">Password</label>
@@ -33,10 +33,6 @@
 
                 <!-- Signup Form -->
                 <form id="signup-form" class="auth-form hidden">
-                    <div class="form-group">
-                        <label for="signup-email">Email</label>
-                        <input type="email" id="signup-email" required>
-                    </div>
                     <div class="form-group">
                         <label for="signup-username">Username</label>
                         <input type="text" id="signup-username" minlength="3" maxlength="20" required>
@@ -53,12 +49,6 @@
                     <button type="submit" class="btn btn-primary btn-full">Create Account</button>
                 </form>
             </div>
-        </div>
-
-        <!-- Email Verification Banner -->
-        <div id="verify-banner" class="verify-banner hidden">
-            <span>Please verify your email to save game history.</span>
-            <button id="btn-resend-verify" class="btn btn-small">Resend Email</button>
         </div>
 
         <!-- Landing/Menu Screen -->

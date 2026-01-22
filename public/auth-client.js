@@ -25,40 +25,8 @@ const Auth = {
             }
         }
 
-        // Handle email verification from URL
-        this.handleVerificationUrl();
-
         // Setup event listeners
         this.setupEventListeners();
-    },
-
-    // Check URL for verification token
-    async handleVerificationUrl() {
-        const params = new URLSearchParams(window.location.search);
-        const verifyToken = params.get('token');
-
-        if (verifyToken && window.location.pathname === '/verify') {
-            try {
-                const response = await fetch(`/auth/verify?token=${verifyToken}`);
-                const data = await response.json();
-
-                if (response.ok) {
-                    alert('Email verified successfully! You can now log in.');
-                    if (this.currentUser) {
-                        this.currentUser.emailVerified = true;
-                        this.updateUI();
-                    }
-                } else {
-                    alert(data.error || 'Verification failed');
-                }
-            } catch (err) {
-                console.error('Verification error:', err);
-                alert('Verification failed. Please try again.');
-            }
-
-            // Clean up URL
-            window.history.replaceState({}, document.title, '/');
-        }
     },
 
     // Setup all event listeners
@@ -85,9 +53,6 @@ const Auth = {
 
         // Signup form
         document.getElementById('signup-form').addEventListener('submit', (e) => this.handleSignup(e));
-
-        // Resend verification
-        document.getElementById('btn-resend-verify').addEventListener('click', () => this.resendVerification());
 
         // Close modal on outside click
         document.getElementById('auth-modal').addEventListener('click', (e) => {
@@ -126,7 +91,7 @@ const Auth = {
     // Handle login form submit
     async handleLogin(e) {
         e.preventDefault();
-        const email = document.getElementById('login-email').value;
+        const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value;
         const errorEl = document.getElementById('login-error');
 
@@ -134,7 +99,7 @@ const Auth = {
             const response = await fetch('/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({ username, password })
             });
 
             const data = await response.json();
@@ -159,7 +124,6 @@ const Auth = {
     // Handle signup form submit
     async handleSignup(e) {
         e.preventDefault();
-        const email = document.getElementById('signup-email').value;
         const username = document.getElementById('signup-username').value.trim();
         const password = document.getElementById('signup-password').value;
         const confirm = document.getElementById('signup-confirm').value;
@@ -181,7 +145,7 @@ const Auth = {
             const response = await fetch('/auth/signup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, username, password })
+                body: JSON.stringify({ username, password })
             });
 
             const data = await response.json();
@@ -192,7 +156,6 @@ const Auth = {
                 localStorage.setItem('authToken', data.token);
                 this.updateUI();
                 this.closeModal();
-                alert('Account created! Check your email to verify your account.');
             } else {
                 errorEl.textContent = data.error || 'Signup failed';
                 errorEl.classList.remove('hidden');
@@ -212,46 +175,19 @@ const Auth = {
         this.updateUI();
     },
 
-    // Resend verification email
-    async resendVerification() {
-        if (!this.token) return;
-
-        try {
-            const response = await fetch('/auth/resend-verification', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${this.token}` }
-            });
-
-            const data = await response.json();
-            alert(data.message || data.error);
-        } catch (err) {
-            console.error('Resend verification error:', err);
-            alert('Failed to resend verification email');
-        }
-    },
-
     // Update UI based on auth state
     updateUI() {
         const authButtons = document.getElementById('auth-buttons');
         const userInfo = document.getElementById('user-info');
-        const verifyBanner = document.getElementById('verify-banner');
         const userDisplayName = document.getElementById('user-display-name');
 
         if (this.currentUser) {
             authButtons.classList.add('hidden');
             userInfo.classList.remove('hidden');
-            userDisplayName.textContent = this.currentUser.username || this.currentUser.email.split('@')[0];
-
-            // Show verification banner if not verified
-            if (!this.currentUser.emailVerified) {
-                verifyBanner.classList.remove('hidden');
-            } else {
-                verifyBanner.classList.add('hidden');
-            }
+            userDisplayName.textContent = this.currentUser.username;
         } else {
             authButtons.classList.remove('hidden');
             userInfo.classList.add('hidden');
-            verifyBanner.classList.add('hidden');
         }
     },
 
