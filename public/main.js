@@ -389,7 +389,6 @@ function startAIGame() {
     boardUI.render();
     UI.updateGameInfo(game);
     UI.hideGameMessage();
-    UI.hide('time-control-select');
     UI.hide('ai-difficulty-select');
     UI.showScreen('game-screen');
 
@@ -492,7 +491,7 @@ function startLocalGame() {
     boardUI.render();
     UI.updateGameInfo(game);
     UI.hideGameMessage();
-    UI.hide('time-control-select');
+    UI.hide('local-game-select');
     UI.showScreen('game-screen');
 
     // Update player status indicators
