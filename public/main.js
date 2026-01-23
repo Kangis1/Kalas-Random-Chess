@@ -268,6 +268,33 @@ function initializeEventListeners() {
     });
     document.getElementById('btn-cancel-create-table').addEventListener('click', hideCreateTableForm);
 
+    // Play against computer
+    document.getElementById('btn-vs-computer').addEventListener('click', showAIDifficultySelect);
+    document.querySelectorAll('.btn-difficulty').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.btn-difficulty').forEach(b => b.classList.remove('selected'));
+            e.target.classList.add('selected');
+            aiDifficulty = e.target.dataset.difficulty;
+        });
+    });
+    document.querySelectorAll('.btn-ai-time').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            selectedTimeControl = parseInt(e.target.dataset.time);
+            startAIGame();
+        });
+    });
+    document.getElementById('btn-cancel-ai').addEventListener('click', hideAIDifficultySelect);
+
+    // Local game
+    document.getElementById('btn-local-game').addEventListener('click', showLocalGameSelect);
+    document.querySelectorAll('.btn-local-time').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            selectedTimeControl = parseInt(e.target.dataset.time);
+            startLocalGame();
+        });
+    });
+    document.getElementById('btn-cancel-local').addEventListener('click', hideLocalGameSelect);
+
     // Rules screen
     document.getElementById('btn-back-rules').addEventListener('click', () => {
         UI.showScreen('menu-screen');
@@ -829,6 +856,34 @@ function hideCreateTableForm() {
     UI.show('main-lobby');
 }
 
+// Show AI difficulty selection
+function showAIDifficultySelect() {
+    UI.hide('main-lobby');
+    UI.show('ai-difficulty-select');
+    // Default to medium difficulty
+    document.querySelectorAll('.btn-difficulty').forEach(b => b.classList.remove('selected'));
+    document.querySelector('.btn-difficulty[data-difficulty="medium"]').classList.add('selected');
+    aiDifficulty = 'medium';
+}
+
+// Hide AI difficulty selection
+function hideAIDifficultySelect() {
+    UI.hide('ai-difficulty-select');
+    UI.show('main-lobby');
+}
+
+// Show local game time selection
+function showLocalGameSelect() {
+    UI.hide('main-lobby');
+    UI.show('local-game-select');
+}
+
+// Hide local game time selection
+function hideLocalGameSelect() {
+    UI.hide('local-game-select');
+    UI.show('main-lobby');
+}
+
 // Create table and show in lobby
 function createTableAndJoinLobby() {
     socket.emit('createGame', { timeControl: selectedTimeControl });
@@ -854,7 +909,7 @@ function updateLobbyDisplay(games) {
     const availableGames = games.filter(g => g.gameId !== currentGameId);
 
     if (availableGames.length === 0) {
-        tablesList.innerHTML = '<p class="no-tables">No tables available. Create one!</p>';
+        tablesList.innerHTML = '<p class="no-tables">No players waiting</p>';
         return;
     }
 

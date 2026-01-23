@@ -936,6 +936,70 @@ body::before {
     margin-bottom: 15px;
 }
 
+/* Offline Options */
+.offline-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 20px auto;
+    max-width: 250px;
+}
+
+.offline-options .btn {
+    padding: 12px 20px;
+}
+
+/* AI Difficulty Select */
+#ai-difficulty-select,
+#local-game-select {
+    max-width: 350px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+#ai-difficulty-select h3,
+#local-game-select h3 {
+    color: #9b59b6;
+    margin-bottom: 10px;
+}
+
+#ai-difficulty-select p,
+#local-game-select p {
+    color: #888;
+    margin-bottom: 15px;
+}
+
+.difficulty-options {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.btn-difficulty {
+    padding: 10px 20px;
+    background: #34495e;
+    color: #fff;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-difficulty:hover {
+    background: #3d566e;
+}
+
+.btn-difficulty.selected {
+    background: #9b59b6;
+    border-color: #8a2be2;
+}
+
+/* View Rules at bottom */
+#btn-rules {
+    margin-top: 30px;
+}
+
 /* Responsive */
 @media (max-width: 600px) {
     #app {

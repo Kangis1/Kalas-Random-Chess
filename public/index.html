@@ -78,12 +78,49 @@
                     <button id="btn-create-table" class="btn btn-primary">Create Table</button>
                 </div>
                 <div class="lobby-tables">
-                    <h4>Available Tables</h4>
+                    <h4>Players Waiting</h4>
                     <div id="tables-list" class="tables-list">
-                        <p class="no-tables">No tables available. Create one!</p>
+                        <p class="no-tables">No players waiting</p>
                     </div>
                 </div>
+                <div class="offline-options">
+                    <button id="btn-vs-computer" class="btn btn-secondary">Play Against Computer</button>
+                    <button id="btn-local-game" class="btn btn-secondary">Play Local Game</button>
+                </div>
                 <button id="btn-rules" class="btn btn-text">View Rules</button>
+            </div>
+
+            <!-- AI Difficulty Selection -->
+            <div id="ai-difficulty-select" class="hidden">
+                <h3>Play Against Computer</h3>
+                <p>Select difficulty:</p>
+                <div class="difficulty-options">
+                    <button class="btn btn-difficulty" data-difficulty="easy">Easy</button>
+                    <button class="btn btn-difficulty" data-difficulty="medium">Medium</button>
+                    <button class="btn btn-difficulty" data-difficulty="hard">Hard</button>
+                </div>
+                <p>Select time control:</p>
+                <div class="time-options">
+                    <button class="btn btn-time btn-ai-time" data-time="5">5 min</button>
+                    <button class="btn btn-time btn-ai-time" data-time="10">10 min</button>
+                    <button class="btn btn-time btn-ai-time" data-time="15">15 min</button>
+                    <button class="btn btn-time btn-ai-time" data-time="0">No Timer</button>
+                </div>
+                <button id="btn-cancel-ai" class="btn btn-text">Cancel</button>
+            </div>
+
+            <!-- Local Game Time Selection -->
+            <div id="local-game-select" class="hidden">
+                <h3>Local Game</h3>
+                <p>Two players, same device</p>
+                <p>Select time control:</p>
+                <div class="time-options">
+                    <button class="btn btn-time btn-local-time" data-time="5">5 min</button>
+                    <button class="btn btn-time btn-local-time" data-time="10">10 min</button>
+                    <button class="btn btn-time btn-local-time" data-time="15">15 min</button>
+                    <button class="btn btn-time btn-local-time" data-time="0">No Timer</button>
+                </div>
+                <button id="btn-cancel-local" class="btn btn-text">Cancel</button>
             </div>
 
             <!-- Time Control for Creating Table -->
