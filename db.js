@@ -40,6 +40,17 @@ async function initializeDatabase() {
       END $$;
     `);
 
+    // Drop email column if it exists (migration from old schema)
+    await client.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_name = 'users' AND column_name = 'email') THEN
+          ALTER TABLE users DROP COLUMN email;
+        END IF;
+      END $$;
+    `);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS games (
         id VARCHAR(255) PRIMARY KEY,
