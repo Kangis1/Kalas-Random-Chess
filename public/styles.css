@@ -69,7 +69,9 @@ body::before {
 #menu-screen h1 {
     font-size: 3rem;
     margin-bottom: 10px;
-    font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, 'Times New Roman', serif;
+    font-family: 'Cinzel', 'Palatino Linotype', Georgia, serif;
+    font-weight: 700;
+    letter-spacing: 2px;
     background: linear-gradient(90deg, #9b59b6, #8a2be2);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -363,7 +365,9 @@ body::before {
     text-align: center;
     margin-bottom: 30px;
     font-size: 2rem;
-    font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, 'Times New Roman', serif;
+    font-family: 'Cinzel', 'Palatino Linotype', Georgia, serif;
+    font-weight: 700;
+    letter-spacing: 2px;
     background: linear-gradient(90deg, #9b59b6, #8a2be2);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
