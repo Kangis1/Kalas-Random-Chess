@@ -304,8 +304,32 @@ function initializeEventListeners() {
     document.getElementById('btn-resign').addEventListener('click', resignGame);
     document.getElementById('btn-new-game').addEventListener('click', returnToMenu);
 
+    // Sound toggle
+    document.getElementById('sound-toggle').addEventListener('click', toggleSound);
+    // Initialize sound toggle icon based on saved preference
+    updateSoundToggleIcon();
+
     // Request lobby data on page load
     socket.emit('getLobby');
+}
+
+// Toggle sound on/off
+function toggleSound() {
+    Sounds.toggle();
+    updateSoundToggleIcon();
+}
+
+// Update the sound toggle icon based on current state
+function updateSoundToggleIcon() {
+    const soundOn = document.querySelector('#sound-toggle .sound-on');
+    const soundOff = document.querySelector('#sound-toggle .sound-off');
+    if (Sounds.isEnabled()) {
+        soundOn.classList.remove('hidden');
+        soundOff.classList.add('hidden');
+    } else {
+        soundOn.classList.add('hidden');
+        soundOff.classList.remove('hidden');
+    }
 }
 
 // Register player with server (for ELO tracking)

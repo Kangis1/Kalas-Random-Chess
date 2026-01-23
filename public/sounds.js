@@ -3,7 +3,9 @@
 
 class SoundManager {
     constructor() {
-        this.enabled = true;
+        // Load saved preference, default to enabled
+        const saved = localStorage.getItem('soundEnabled');
+        this.enabled = saved === null ? true : saved === 'true';
         this.audioContext = null;
         this.initialized = false;
     }
@@ -24,6 +26,12 @@ class SoundManager {
     // Toggle sound on/off
     toggle() {
         this.enabled = !this.enabled;
+        localStorage.setItem('soundEnabled', this.enabled);
+        return this.enabled;
+    }
+
+    // Check if sound is enabled
+    isEnabled() {
         return this.enabled;
     }
 
