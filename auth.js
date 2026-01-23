@@ -29,6 +29,11 @@ router.post('/signup', async (req, res) => {
     return res.status(400).json({ error: 'Username can only contain letters, numbers, and underscores' });
   }
 
+  // Check if database is available
+  if (!pool) {
+    return res.status(503).json({ error: 'Database not available. Please try again later.' });
+  }
+
   try {
     // Check if username already exists
     const existingUser = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
@@ -56,8 +61,15 @@ router.post('/signup', async (req, res) => {
       token
     });
   } catch (err) {
-    console.error('Signup error:', err);
-    res.status(500).json({ error: 'Failed to create account' });
+    console.error('Signup error:', err.message || err);
+    // Provide more specific error messages
+    if (err.code === '23505') {
+      return res.status(400).json({ error: 'Username already taken' });
+    }
+    if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND') {
+      return res.status(503).json({ error: 'Database connection failed. Please try again later.' });
+    }
+    res.status(500).json({ error: 'Failed to create account. Please try again.' });
   }
 });
 
@@ -67,6 +79,11 @@ router.post('/login', async (req, res) => {
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
+  }
+
+  // Check if database is available
+  if (!pool) {
+    return res.status(503).json({ error: 'Database not available. Please try again later.' });
   }
 
   try {
