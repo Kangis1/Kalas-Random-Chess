@@ -788,10 +788,15 @@ body::before {
 }
 
 #btn-create-table {
-    padding: 10px 20px;
-    font-size: 0.9rem;
-    max-width: 150px;
+    padding: 12px 24px;
+    font-size: 1rem;
+    max-width: 250px;
     margin: 0 auto;
+    background: #9b59b6;
+}
+
+#btn-create-table:hover {
+    background: #8a2be2;
 }
 
 .join-code-section {
@@ -939,14 +944,20 @@ body::before {
 /* Offline Options */
 .offline-options {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    justify-content: center;
     gap: 10px;
     margin: 20px auto;
-    max-width: 250px;
 }
 
 .offline-options .btn {
-    padding: 12px 20px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    background: #9b59b6;
+}
+
+.offline-options .btn:hover {
+    background: #8a2be2;
 }
 
 /* AI Difficulty Select */
