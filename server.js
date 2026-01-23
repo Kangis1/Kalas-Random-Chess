@@ -68,23 +68,70 @@ async function updatePlayerElo(userId, newElo) {
     }
 }
 
+// Save game result to database
+async function saveGameResult(gameId, gameData, winner, eloChanges) {
+    if (!pool) return;
+
+    const whiteInfo = playerInfo.get(gameData.white);
+    const blackInfo = playerInfo.get(gameData.black);
+
+    try {
+        await pool.query(`
+            INSERT INTO games (id, white_player_id, black_player_id, winner, result, time_control,
+                               white_elo_before, black_elo_before, white_elo_change, black_elo_change, completed_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+            ON CONFLICT (id) DO UPDATE SET
+                winner = EXCLUDED.winner,
+                result = EXCLUDED.result,
+                white_elo_before = EXCLUDED.white_elo_before,
+                black_elo_before = EXCLUDED.black_elo_before,
+                white_elo_change = EXCLUDED.white_elo_change,
+                black_elo_change = EXCLUDED.black_elo_change,
+                completed_at = CURRENT_TIMESTAMP
+        `, [
+            gameId,
+            whiteInfo?.userId || null,
+            blackInfo?.userId || null,
+            winner,
+            winner === 'draw' ? 'draw' : `${winner} wins`,
+            gameData.timeControl,
+            eloChanges?.whiteOldElo || whiteInfo?.elo || null,
+            eloChanges?.blackOldElo || blackInfo?.elo || null,
+            eloChanges?.whiteChange || null,
+            eloChanges?.blackChange || null
+        ]);
+        console.log(`Game ${gameId} saved to database`);
+    } catch (err) {
+        console.error('Failed to save game:', err);
+    }
+}
+
 // Process game result and update ELOs
-async function processGameResult(gameData, winner) {
+async function processGameResult(gameId, gameData, winner) {
     const whiteInfo = playerInfo.get(gameData.white);
     const blackInfo = playerInfo.get(gameData.black);
 
     // Only update ELO if both players are logged in
     if (!whiteInfo?.userId || !blackInfo?.userId) {
         console.log('Skipping ELO update - not all players logged in');
+        // Still save the game result even without ELO changes
+        await saveGameResult(gameId, gameData, winner, null);
         return null;
     }
 
     const result = winner === 'draw' ? 'draw' : winner;
     const eloChanges = calculateEloChanges(whiteInfo.elo, blackInfo.elo, result);
 
+    // Store old ELOs for history
+    eloChanges.whiteOldElo = whiteInfo.elo;
+    eloChanges.blackOldElo = blackInfo.elo;
+
     // Update database
     await updatePlayerElo(whiteInfo.userId, eloChanges.whiteNewElo);
     await updatePlayerElo(blackInfo.userId, eloChanges.blackNewElo);
+
+    // Save game result with ELO changes
+    await saveGameResult(gameId, gameData, winner, eloChanges);
 
     // Update local cache
     whiteInfo.elo = eloChanges.whiteNewElo;
@@ -139,7 +186,7 @@ function startGameTimer(gameId) {
             io.to(gameData.black).emit('timeout', timeout);
 
             // Calculate and update ELO for timeout
-            processGameResult(gameData, timeout.winner).then(eloChanges => {
+            processGameResult(gameId, gameData, timeout.winner).then(eloChanges => {
                 if (eloChanges) {
                     io.to(gameData.white).emit('eloUpdate', {
                         change: eloChanges.whiteChange,
@@ -347,7 +394,7 @@ io.on('connection', (socket) => {
 
             // Calculate and update ELO
             const winner = result.gameStatus.result === 'stalemate' ? 'draw' : result.gameStatus.winner;
-            processGameResult(gameData, winner).then(eloChanges => {
+            processGameResult(gameId, gameData, winner).then(eloChanges => {
                 if (eloChanges) {
                     // Notify both players of ELO changes
                     io.to(gameData.white).emit('eloUpdate', {
@@ -405,7 +452,7 @@ io.on('connection', (socket) => {
         });
 
         // Calculate and update ELO for resignation
-        processGameResult(gameData, winner).then(eloChanges => {
+        processGameResult(gameId, gameData, winner).then(eloChanges => {
             if (eloChanges) {
                 io.to(gameData.white).emit('eloUpdate', {
                     change: eloChanges.whiteChange,
@@ -535,7 +582,7 @@ io.on('connection', (socket) => {
                             }
 
                             // Calculate and update ELO for forfeit
-                            processGameResult(gameData, winner).then(eloChanges => {
+                            processGameResult(gameId, gameData, winner).then(eloChanges => {
                                 if (eloChanges && opponentId) {
                                     const isOpponentWhite = gameData.white !== socket.id;
                                     io.to(opponentId).emit('eloUpdate', {

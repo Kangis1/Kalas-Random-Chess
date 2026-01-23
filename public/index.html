@@ -58,9 +58,64 @@
         <div id="menu-screen" class="screen active">
             <!-- User Info (shown when logged in) -->
             <div id="user-info" class="user-info hidden">
-                <span id="user-display-name">Guest</span>
-                <span id="user-elo-display" class="user-elo">(1500)</span>
+                <div class="user-info-clickable" id="user-info-trigger">
+                    <span id="user-display-name">Guest</span>
+                    <span id="user-elo-display" class="user-elo">(1500)</span>
+                </div>
                 <button id="btn-logout" class="btn btn-small">Logout</button>
+                <!-- Profile Dropdown -->
+                <div id="profile-dropdown" class="profile-dropdown hidden">
+                    <button id="btn-view-history" class="profile-dropdown-item">View History</button>
+                </div>
+            </div>
+
+            <!-- Profile Modal -->
+            <div id="profile-modal" class="modal hidden">
+                <div class="modal-content profile-modal">
+                    <button class="modal-close" id="profile-close">&times;</button>
+                    <h2 id="profile-username">Player Stats</h2>
+
+                    <!-- Win/Loss/Draw Meter -->
+                    <div class="wld-section">
+                        <h3>Record</h3>
+                        <div class="wld-stats">
+                            <div class="wld-stat wins">
+                                <span class="wld-count" id="stat-wins">0</span>
+                                <span class="wld-label">Wins</span>
+                            </div>
+                            <div class="wld-stat draws">
+                                <span class="wld-count" id="stat-draws">0</span>
+                                <span class="wld-label">Draws</span>
+                            </div>
+                            <div class="wld-stat losses">
+                                <span class="wld-count" id="stat-losses">0</span>
+                                <span class="wld-label">Losses</span>
+                            </div>
+                        </div>
+                        <div class="wld-bar">
+                            <div class="wld-bar-wins" id="wld-bar-wins"></div>
+                            <div class="wld-bar-draws" id="wld-bar-draws"></div>
+                            <div class="wld-bar-losses" id="wld-bar-losses"></div>
+                        </div>
+                    </div>
+
+                    <!-- ELO Graph -->
+                    <div class="elo-graph-section">
+                        <h3>Rating History</h3>
+                        <div class="elo-graph-container">
+                            <canvas id="elo-graph"></canvas>
+                        </div>
+                        <div class="elo-graph-labels">
+                            <span class="graph-label-left">Game 1</span>
+                            <span class="graph-label-right" id="graph-label-games">Game 0</span>
+                        </div>
+                    </div>
+
+                    <div id="no-games-message" class="no-games-message hidden">
+                        <p>No ranked games played yet.</p>
+                        <p>Play online matches to track your rating!</p>
+                    </div>
+                </div>
             </div>
 
             <h1>Kalas Random Chess</h1>

@@ -154,4 +154,88 @@ router.get('/me', async (req, res) => {
   }
 });
 
+// Get user stats and game history
+router.get('/stats', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const userId = decoded.userId;
+
+    // Get user's current ELO
+    const userResult = await pool.query(
+      'SELECT elo FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get game history with ELO changes
+    const gamesResult = await pool.query(`
+      SELECT
+        id,
+        CASE WHEN white_player_id = $1 THEN 'white' ELSE 'black' END as played_as,
+        winner,
+        result,
+        CASE WHEN white_player_id = $1 THEN white_elo_before ELSE black_elo_before END as elo_before,
+        CASE WHEN white_player_id = $1 THEN white_elo_change ELSE black_elo_change END as elo_change,
+        completed_at
+      FROM games
+      WHERE (white_player_id = $1 OR black_player_id = $1)
+        AND completed_at IS NOT NULL
+        AND (white_elo_change IS NOT NULL OR black_elo_change IS NOT NULL)
+      ORDER BY completed_at ASC
+    `, [userId]);
+
+    // Calculate win/loss/draw stats
+    let wins = 0, losses = 0, draws = 0;
+    const eloHistory = [];
+
+    gamesResult.rows.forEach(game => {
+      const playedAs = game.played_as;
+      const winner = game.winner;
+
+      if (winner === 'draw' || game.result === 'stalemate') {
+        draws++;
+      } else if (winner === playedAs) {
+        wins++;
+      } else if (winner) {
+        losses++;
+      }
+
+      // Build ELO history
+      if (game.elo_before !== null && game.elo_change !== null) {
+        eloHistory.push({
+          gameNumber: eloHistory.length + 1,
+          eloBefore: game.elo_before,
+          eloAfter: game.elo_before + game.elo_change,
+          change: game.elo_change,
+          date: game.completed_at
+        });
+      }
+    });
+
+    res.json({
+      currentElo: userResult.rows[0].elo || 1500,
+      stats: {
+        wins,
+        losses,
+        draws,
+        totalGames: wins + losses + draws
+      },
+      eloHistory
+    });
+  } catch (err) {
+    console.error('Stats error:', err);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
 module.exports = router;

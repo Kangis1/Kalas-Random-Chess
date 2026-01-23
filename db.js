@@ -59,9 +59,27 @@ async function initializeDatabase() {
         winner VARCHAR(10),
         result VARCHAR(50),
         time_control INTEGER,
+        white_elo_before INTEGER,
+        black_elo_before INTEGER,
+        white_elo_change INTEGER,
+        black_elo_change INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         completed_at TIMESTAMP
       )
+    `);
+
+    // Add ELO tracking columns if they don't exist (migration)
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name = 'games' AND column_name = 'white_elo_before') THEN
+          ALTER TABLE games ADD COLUMN white_elo_before INTEGER;
+          ALTER TABLE games ADD COLUMN black_elo_before INTEGER;
+          ALTER TABLE games ADD COLUMN white_elo_change INTEGER;
+          ALTER TABLE games ADD COLUMN black_elo_change INTEGER;
+        END IF;
+      END $$;
     `);
 
     console.log('Database tables initialized');

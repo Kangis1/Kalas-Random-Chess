@@ -1302,6 +1302,175 @@ body::before {
     font-size: 0.9rem;
 }
 
+/* Clickable user info */
+.user-info-clickable {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    transition: background 0.2s ease;
+}
+
+.user-info-clickable:hover {
+    background: rgba(155, 89, 182, 0.2);
+}
+
+/* Profile Dropdown */
+.profile-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 50px;
+    background: rgba(30, 30, 50, 0.98);
+    border: 1px solid #34495e;
+    border-radius: 8px;
+    padding: 5px;
+    margin-top: 5px;
+    z-index: 100;
+    min-width: 140px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.profile-dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 10px 15px;
+    background: none;
+    border: none;
+    color: #fff;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    transition: background 0.2s ease;
+}
+
+.profile-dropdown-item:hover {
+    background: rgba(155, 89, 182, 0.3);
+}
+
+/* Profile Modal */
+.profile-modal {
+    max-width: 500px;
+    width: 95%;
+}
+
+.profile-modal h2 {
+    text-align: center;
+    margin-bottom: 25px;
+    color: #9b59b6;
+    font-size: 1.5rem;
+}
+
+.profile-modal h3 {
+    color: #bbb;
+    font-size: 1rem;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Win/Loss/Draw Section */
+.wld-section {
+    margin-bottom: 30px;
+}
+
+.wld-stats {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 15px;
+}
+
+.wld-stat {
+    text-align: center;
+}
+
+.wld-count {
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.wld-label {
+    font-size: 0.85rem;
+    color: #888;
+    text-transform: uppercase;
+}
+
+.wld-stat.wins .wld-count {
+    color: #2ecc71;
+}
+
+.wld-stat.draws .wld-count {
+    color: #95a5a6;
+}
+
+.wld-stat.losses .wld-count {
+    color: #e74c3c;
+}
+
+/* W/L/D Bar */
+.wld-bar {
+    display: flex;
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #2c3e50;
+}
+
+.wld-bar-wins {
+    background: linear-gradient(90deg, #27ae60, #2ecc71);
+    transition: width 0.5s ease;
+}
+
+.wld-bar-draws {
+    background: linear-gradient(90deg, #7f8c8d, #95a5a6);
+    transition: width 0.5s ease;
+}
+
+.wld-bar-losses {
+    background: linear-gradient(90deg, #c0392b, #e74c3c);
+    transition: width 0.5s ease;
+}
+
+/* ELO Graph Section */
+.elo-graph-section {
+    margin-bottom: 20px;
+}
+
+.elo-graph-container {
+    background: rgba(44, 62, 80, 0.5);
+    border-radius: 10px;
+    padding: 15px;
+    height: 200px;
+    position: relative;
+}
+
+#elo-graph {
+    width: 100%;
+    height: 100%;
+}
+
+.elo-graph-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 0.8rem;
+    color: #888;
+}
+
+/* No Games Message */
+.no-games-message {
+    text-align: center;
+    padding: 30px;
+    color: #888;
+}
+
+.no-games-message p {
+    margin-bottom: 10px;
+}
+
 /* Auth Buttons (when logged out) */
 .auth-buttons {
     position: absolute;
