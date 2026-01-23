@@ -68,75 +68,10 @@
                 <button id="btn-signup" class="btn btn-small btn-secondary">Sign Up</button>
             </div>
 
-            <div class="menu-buttons">
-                <button id="btn-vs-computer" class="btn btn-primary">Play vs Computer</button>
-                <button id="btn-play-online" class="btn btn-secondary">Play Online</button>
-                <button id="btn-local-game" class="btn btn-secondary">Local Game (2 Players)</button>
-                <button id="btn-rules" class="btn btn-text">View Rules</button>
-            </div>
-
-            <!-- AI Difficulty Selection -->
-            <div id="ai-difficulty-select" class="hidden">
-                <h3>Select Difficulty</h3>
-                <div class="difficulty-options">
-                    <button class="btn btn-difficulty" data-difficulty="easy">
-                        <span class="diff-icon">🟢</span>
-                        <span class="diff-name">Easy</span>
-                        <span class="diff-desc">Relaxed play</span>
-                    </button>
-                    <button class="btn btn-difficulty" data-difficulty="medium">
-                        <span class="diff-icon">🟡</span>
-                        <span class="diff-name">Medium</span>
-                        <span class="diff-desc">Balanced challenge</span>
-                    </button>
-                    <button class="btn btn-difficulty" data-difficulty="hard">
-                        <span class="diff-icon">🔴</span>
-                        <span class="diff-name">Hard</span>
-                        <span class="diff-desc">Tough opponent</span>
-                    </button>
-                </div>
-                <button id="btn-cancel-difficulty" class="btn btn-text">Cancel</button>
-            </div>
-
-            <!-- Time Control Selection -->
-            <div id="time-control-select" class="hidden">
-                <h3>Select Time Control</h3>
-                <div class="time-options">
-                    <button class="btn btn-time" data-time="5">5 min</button>
-                    <button class="btn btn-time" data-time="10">10 min</button>
-                    <button class="btn btn-time" data-time="15">15 min</button>
-                    <button class="btn btn-time" data-time="20">20 min</button>
-                    <button class="btn btn-time" data-time="0">No<br>Timer</button>
-                </div>
-                <button id="btn-cancel-time" class="btn btn-text">Cancel</button>
-            </div>
-
-            <div id="join-form" class="hidden">
-                <input type="text" id="game-code-input" placeholder="Enter game code" maxlength="6">
-                <button id="btn-submit-join" class="btn btn-primary">Join</button>
-                <button id="btn-cancel-join" class="btn btn-text">Cancel</button>
-            </div>
-
-            <div id="waiting-room" class="hidden">
-                <h3>Table Created</h3>
-                <p class="waiting-text">Waiting for opponent to join...</p>
-                <div class="waiting-info">
-                    <span class="table-time" id="waiting-time-display">10 min</span>
-                    <span class="table-code" id="waiting-code-display">#ABC123</span>
-                </div>
-                <p class="waiting-hint">Your table is visible in the lobby</p>
-                <button id="btn-cancel-waiting" class="btn btn-danger">Cancel Table</button>
-            </div>
-
-            <!-- Online Lobby -->
-            <div id="online-lobby" class="hidden">
-                <h3>Online Lobby</h3>
+            <!-- Main Lobby (shown by default) -->
+            <div id="main-lobby">
                 <div class="lobby-actions">
                     <button id="btn-create-table" class="btn btn-primary">Create Table</button>
-                    <div class="join-code-section">
-                        <input type="text" id="lobby-code-input" placeholder="Code" maxlength="6">
-                        <button id="btn-join-code" class="btn btn-secondary">Join by Code</button>
-                    </div>
                 </div>
                 <div class="lobby-tables">
                     <h4>Available Tables</h4>
@@ -144,7 +79,7 @@
                         <p class="no-tables">No tables available. Create one!</p>
                     </div>
                 </div>
-                <button id="btn-back-lobby" class="btn btn-text">Back to Menu</button>
+                <button id="btn-rules" class="btn btn-text">View Rules</button>
             </div>
 
             <!-- Time Control for Creating Table -->
@@ -159,6 +94,16 @@
                     <button class="btn btn-time btn-table-time" data-time="0">No<br>Timer</button>
                 </div>
                 <button id="btn-cancel-create-table" class="btn btn-text">Cancel</button>
+            </div>
+
+            <div id="waiting-room" class="hidden">
+                <h3>Table Created</h3>
+                <p class="waiting-text">Waiting for opponent to join...</p>
+                <div class="waiting-info">
+                    <span class="table-time" id="waiting-time-display">10 min</span>
+                </div>
+                <p class="waiting-hint">Your table is visible in the lobby</p>
+                <button id="btn-cancel-waiting" class="btn btn-danger">Cancel Table</button>
             </div>
         </div>
 

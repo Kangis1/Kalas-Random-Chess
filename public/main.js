@@ -11,7 +11,6 @@ let ai = null;
 let aiDifficulty = 'medium';
 let selectedTimeControl = 10; // Default 10 minutes
 let timerInterval = null;
-let pendingGameType = null; // 'create', 'local', 'ai', or 'join'
 let aiThinking = false;
 
 // Initialize the application
@@ -77,11 +76,9 @@ function initializeSocket() {
     // Game created - waiting for opponent
     socket.on('gameCreated', (data) => {
         currentGameId = data.gameId;
-        document.getElementById('waiting-code-display').textContent = '#' + data.gameId;
         document.getElementById('waiting-time-display').textContent = data.timeControl === 0 ? 'Untimed' : data.timeControl + ' min';
-        UI.hide('time-control-select');
         UI.hide('create-table-form');
-        UI.hide('online-lobby');
+        UI.hide('main-lobby');
         UI.show('waiting-room');
     });
 
@@ -228,9 +225,6 @@ function initializeSocket() {
         Sounds.invalid();
         alert(data.message);
         UI.hide('waiting-room');
-        UI.hide('join-form');
-        UI.hide('time-control-select');
-        UI.hide('ai-difficulty-select');
         UI.hide('create-table-form');
     });
 
@@ -242,54 +236,19 @@ function initializeSocket() {
 
 // Initialize UI event listeners
 function initializeEventListeners() {
-    // Menu buttons
-    document.getElementById('btn-vs-computer').addEventListener('click', showDifficultySelect);
-    document.getElementById('btn-play-online').addEventListener('click', showOnlineLobby);
-    document.getElementById('btn-local-game').addEventListener('click', () => showTimeControl('local'));
+    // Rules button
     document.getElementById('btn-rules').addEventListener('click', showRules);
-
-    // AI Difficulty selection
-    document.querySelectorAll('.btn-difficulty').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const button = e.target.closest('.btn-difficulty');
-            aiDifficulty = button.dataset.difficulty;
-            showTimeControl('ai');
-        });
-    });
-    document.getElementById('btn-cancel-difficulty').addEventListener('click', hideDifficultySelect);
-
-    // Time control selection
-    document.querySelectorAll('.btn-time').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            selectedTimeControl = parseInt(e.target.dataset.time);
-            document.querySelectorAll('.btn-time').forEach(b => b.classList.remove('selected'));
-            e.target.classList.add('selected');
-            confirmTimeControl();
-        });
-    });
-    document.getElementById('btn-cancel-time').addEventListener('click', hideTimeControl);
-
-    // Join form
-    document.getElementById('btn-submit-join').addEventListener('click', joinGame);
-    document.getElementById('btn-cancel-join').addEventListener('click', hideJoinForm);
-    document.getElementById('game-code-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') joinGame();
-    });
 
     // Waiting room
     document.getElementById('btn-cancel-waiting').addEventListener('click', cancelWaiting);
 
-    // Online lobby
+    // Create table button (now on main menu)
     document.getElementById('btn-create-table').addEventListener('click', showCreateTableForm);
-    document.getElementById('btn-join-code').addEventListener('click', joinByCode);
-    document.getElementById('btn-back-lobby').addEventListener('click', hideOnlineLobby);
-    document.getElementById('lobby-code-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') joinByCode();
-    });
 
-    // Create table form
+    // Create table form time options
     document.querySelectorAll('.btn-table-time').forEach(btn => {
         btn.addEventListener('click', (e) => {
+            if (!Auth.requireLogin()) return;
             selectedTimeControl = parseInt(e.target.dataset.time);
             createTableAndJoinLobby();
         });
@@ -304,79 +263,9 @@ function initializeEventListeners() {
     // Game controls
     document.getElementById('btn-resign').addEventListener('click', resignGame);
     document.getElementById('btn-new-game').addEventListener('click', returnToMenu);
-}
 
-// Show AI difficulty selection
-function showDifficultySelect() {
-    if (!Auth.requireLogin()) return;
-    UI.hide('join-form');
-    UI.hide('waiting-room');
-    UI.hide('time-control-select');
-    UI.show('ai-difficulty-select');
-}
-
-// Hide AI difficulty selection
-function hideDifficultySelect() {
-    UI.hide('ai-difficulty-select');
-}
-
-// Show time control selection
-function showTimeControl(gameType) {
-    if (!Auth.requireLogin()) return;
-    pendingGameType = gameType;
-    UI.hide('join-form');
-    UI.hide('waiting-room');
-    UI.hide('ai-difficulty-select');
-    UI.show('time-control-select');
-    // Reset selection highlight
-    document.querySelectorAll('.btn-time').forEach(b => b.classList.remove('selected'));
-}
-
-// Hide time control selection
-function hideTimeControl() {
-    UI.hide('time-control-select');
-    pendingGameType = null;
-}
-
-// Confirm time control and proceed
-function confirmTimeControl() {
-    if (pendingGameType === 'create') {
-        createOnlineGame();
-    } else if (pendingGameType === 'local') {
-        startLocalGame();
-    } else if (pendingGameType === 'ai') {
-        startAIGame();
-    }
-}
-
-// Create online game
-function createOnlineGame() {
-    socket.emit('createGame', { timeControl: selectedTimeControl });
-}
-
-// Show join form
-function showJoinForm() {
-    UI.hide('time-control-select');
-    UI.hide('ai-difficulty-select');
-    UI.show('join-form');
-    document.getElementById('game-code-input').value = '';
-    document.getElementById('game-code-input').focus();
-}
-
-// Hide join form
-function hideJoinForm() {
-    UI.hide('join-form');
-}
-
-// Join existing game
-function joinGame() {
-    const gameId = document.getElementById('game-code-input').value.trim().toUpperCase();
-    if (gameId.length === 6) {
-        socket.emit('joinGame', { gameId });
-    } else {
-        Sounds.invalid();
-        alert('Please enter a valid 6-character game code');
-    }
+    // Request lobby data on page load
+    socket.emit('getLobby');
 }
 
 // Cancel waiting for opponent
@@ -386,7 +275,7 @@ function cancelWaiting() {
     }
     currentGameId = null;
     UI.hide('waiting-room');
-    UI.show('online-lobby');
+    UI.show('main-lobby');
 }
 
 // Start AI game
@@ -869,66 +758,35 @@ function returnToMenu() {
     isAIGame = false;
     ai = null;
     aiThinking = false;
-    pendingGameType = null;
 
     UI.hide('waiting-room');
-    UI.hide('join-form');
-    UI.hide('time-control-select');
-    UI.hide('ai-difficulty-select');
-    UI.hide('online-lobby');
     UI.hide('create-table-form');
+    UI.show('main-lobby');
     UI.hideGameMessage();
     UI.showAIThinking(false);
     UI.showScreen('menu-screen');
-}
 
-// Show online lobby
-function showOnlineLobby() {
-    if (!Auth.requireLogin()) return;
-    UI.hide('time-control-select');
-    UI.hide('ai-difficulty-select');
-    UI.hide('join-form');
-    UI.hide('waiting-room');
-    UI.hide('create-table-form');
-    UI.show('online-lobby');
-    // Request fresh lobby data
+    // Refresh lobby data
     socket.emit('getLobby');
-}
-
-// Hide online lobby
-function hideOnlineLobby() {
-    UI.hide('online-lobby');
-    UI.hide('create-table-form');
 }
 
 // Show create table form
 function showCreateTableForm() {
-    UI.hide('online-lobby');
+    if (!Auth.requireLogin()) return;
+    UI.hide('main-lobby');
     UI.show('create-table-form');
 }
 
 // Hide create table form
 function hideCreateTableForm() {
     UI.hide('create-table-form');
-    UI.show('online-lobby');
+    UI.show('main-lobby');
 }
 
 // Create table and show in lobby
 function createTableAndJoinLobby() {
     socket.emit('createGame', { timeControl: selectedTimeControl });
     UI.hide('create-table-form');
-    UI.hide('online-lobby');
-}
-
-// Join game by code from lobby
-function joinByCode() {
-    const gameId = document.getElementById('lobby-code-input').value.trim().toUpperCase();
-    if (gameId.length === 6) {
-        socket.emit('joinGame', { gameId });
-    } else {
-        Sounds.invalid();
-        alert('Please enter a valid 6-character game code');
-    }
 }
 
 // Join a table from lobby
