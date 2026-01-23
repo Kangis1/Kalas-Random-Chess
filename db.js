@@ -1,12 +1,21 @@
 const { Pool } = require('pg');
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+let pool = null;
+
+// Only create pool if DATABASE_URL is set
+if (process.env.DATABASE_URL) {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  });
+}
 
 // Initialize database tables
 async function initializeDatabase() {
+  if (!pool) {
+    console.log('No DATABASE_URL set - running without database (guest mode only)');
+    return;
+  }
   const client = await pool.connect();
   try {
     await client.query(`
