@@ -110,29 +110,123 @@
 
         <!-- Rules Screen -->
         <div id="rules-screen" class="screen">
-            <h2>Kalas Random Rules</h2>
+            <h2>Kalas Random Chess</h2>
             <div class="rules-content">
                 <h3>Setup</h3>
-                <ul>
-                    <li><strong>White King:</strong> Randomly placed on rank 1 (A1-H1)</li>
-                    <li><strong>White Pawns (8):</strong> Randomly placed on ranks 2-4</li>
-                    <li><strong>White Pieces (Q, 2R, 2B, 2N):</strong> Randomly placed in remaining squares on ranks 1-3</li>
-                    <li><strong>Black King:</strong> Randomly placed on rank 8 (A8-H8)</li>
-                    <li><strong>Black Pawns (8):</strong> Randomly placed on ranks 4-7</li>
-                    <li><strong>Black Pieces (Q, 2R, 2B, 2N):</strong> Randomly placed in remaining squares on ranks 6-8</li>
-                </ul>
-                <p><em>Bishops may be on the same color. Kings can start in check.</em></p>
+                <p class="rules-intro">All pieces are randomly placed at the start of each game.</p>
+
+                <div class="rules-visual-section">
+                    <div class="rule-card">
+                        <div class="mini-board kings-zone">
+                            <div class="board-row">
+                                <div class="mini-square light"></div>
+                                <div class="mini-square dark"></div>
+                                <div class="mini-square light"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark"></div>
+                                <div class="mini-square light"></div>
+                                <div class="mini-square dark"></div>
+                            </div>
+                        </div>
+                        <p class="rule-label">Kings in back row</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <div class="mini-board pawns-zone">
+                            <div class="board-row">
+                                <div class="mini-square light"></div>
+                                <div class="mini-square dark"></div>
+                                <div class="mini-square light"></div>
+                                <div class="mini-square dark"></div>
+                                <div class="mini-square light"></div>
+                                <div class="mini-square dark"></div>
+                                <div class="mini-square light"></div>
+                                <div class="mini-square dark"></div>
+                            </div>
+                            <div class="board-row highlighted-row">
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                            </div>
+                            <div class="board-row highlighted-row">
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                            </div>
+                            <div class="board-row highlighted-row">
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                            </div>
+                        </div>
+                        <p class="rule-label">Pawns in rows 2-4</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <div class="mini-board pieces-zone">
+                            <div class="board-row highlighted-row">
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                            </div>
+                            <div class="board-row highlighted-row">
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                            </div>
+                            <div class="board-row highlighted-row">
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                                <div class="mini-square light highlighted"></div>
+                                <div class="mini-square dark highlighted"></div>
+                            </div>
+                            <div class="board-row">
+                                <div class="mini-square dark"></div>
+                                <div class="mini-square light"></div>
+                                <div class="mini-square dark"></div>
+                                <div class="mini-square light"></div>
+                                <div class="mini-square dark"></div>
+                                <div class="mini-square light"></div>
+                                <div class="mini-square dark"></div>
+                                <div class="mini-square light"></div>
+                            </div>
+                        </div>
+                        <p class="rule-label">Other pieces in rows 1-3</p>
+                    </div>
+                </div>
 
                 <h3>Opening Sequence</h3>
-                <ol>
-                    <li><strong>Move 1 (White):</strong> No captures allowed</li>
-                    <li><strong>Move 2 (Black):</strong> No captures allowed</li>
-                    <li><strong>Move 3 (White):</strong> No captures allowed</li>
-                    <li><strong>Move 4+ :</strong> Normal chess rules apply</li>
-                </ol>
-
-                <h3>Victory</h3>
-                <p>Checkmate the opponent's king. Standard chess rules for check, checkmate, and stalemate apply after the opening sequence.</p>
+                <p class="opening-rule">White cannot capture on first two moves. Black cannot capture on first move.</p>
             </div>
             <button id="btn-back-rules" class="btn btn-secondary">Back to Menu</button>
         </div>
