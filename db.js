@@ -14,9 +14,21 @@ async function initializeDatabase() {
         id SERIAL PRIMARY KEY,
         username VARCHAR(50) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
+        elo INTEGER DEFAULT 1500,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_login TIMESTAMP
       )
+    `);
+
+    // Add elo column if it doesn't exist (for existing databases)
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name = 'users' AND column_name = 'elo') THEN
+          ALTER TABLE users ADD COLUMN elo INTEGER DEFAULT 1500;
+        END IF;
+      END $$;
     `);
 
     await client.query(`

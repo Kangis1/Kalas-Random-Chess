@@ -617,6 +617,12 @@ body {
     margin-bottom: 20px;
 }
 
+#game-message .elo-change {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-top: 10px;
+}
+
 /* Online Lobby */
 #online-lobby {
     max-width: 500px;
@@ -727,6 +733,23 @@ body {
     font-family: monospace;
     color: #888;
     font-size: 0.85rem;
+}
+
+.table-creator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.creator-name {
+    font-weight: 600;
+    color: #fff;
+}
+
+.creator-elo {
+    color: #f39c12;
+    font-weight: 600;
+    font-size: 0.9rem;
 }
 
 .btn-join-table {
@@ -1016,6 +1039,11 @@ body {
 #user-display-name {
     color: #f39c12;
     font-weight: 600;
+}
+
+.user-elo {
+    color: #888;
+    font-size: 0.9rem;
 }
 
 /* Auth Buttons (when logged out) */

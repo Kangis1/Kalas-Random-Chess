@@ -12,6 +12,7 @@ let aiDifficulty = 'medium';
 let selectedTimeControl = 10; // Default 10 minutes
 let timerInterval = null;
 let aiThinking = false;
+let currentGamePlayers = null; // { white: { username, elo }, black: { username, elo } }
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
@@ -65,6 +66,8 @@ function initializeSocket() {
 
     socket.on('connect', () => {
         console.log('Connected to server');
+        // Register player info if logged in
+        registerPlayerWithServer();
         // Check for active game after connection is established
         checkForActiveGame();
     });
@@ -86,6 +89,7 @@ function initializeSocket() {
     socket.on('gameJoined', (data) => {
         currentGameId = data.gameId;
         playerColor = data.color;
+        currentGamePlayers = data.players;
         Sounds.opponentJoined();
         startOnlineGame(data.gameState, data.color);
     });
@@ -93,8 +97,17 @@ function initializeSocket() {
     // Game started (both players connected)
     socket.on('gameStart', (data) => {
         playerColor = data.color;
+        currentGamePlayers = data.players;
         Sounds.opponentJoined();
         startOnlineGame(data.gameState, data.color);
+    });
+
+    // ELO update after game ends
+    socket.on('eloUpdate', (data) => {
+        console.log(`ELO update: ${data.change > 0 ? '+' : ''}${data.change} (new: ${data.newElo})`);
+        Auth.updateElo(data.newElo);
+        // Show ELO change in game message if visible
+        showEloChange(data.change);
     });
 
     // Opponent made a move
@@ -266,6 +279,32 @@ function initializeEventListeners() {
 
     // Request lobby data on page load
     socket.emit('getLobby');
+}
+
+// Register player with server (for ELO tracking)
+function registerPlayerWithServer() {
+    if (Auth.isLoggedIn() && socket) {
+        socket.emit('registerPlayer', {
+            userId: Auth.getUserId(),
+            username: Auth.currentUser.username,
+            elo: Auth.getElo()
+        });
+    }
+}
+
+// Show ELO change after game
+function showEloChange(change) {
+    const messageEl = document.getElementById('game-message');
+    if (messageEl && !messageEl.classList.contains('hidden')) {
+        const eloEl = messageEl.querySelector('.elo-change');
+        if (!eloEl) {
+            const changeText = document.createElement('p');
+            changeText.className = 'elo-change';
+            changeText.textContent = `ELO: ${change > 0 ? '+' : ''}${change}`;
+            changeText.style.color = change > 0 ? '#2ecc71' : '#e74c3c';
+            messageEl.appendChild(changeText);
+        }
+    }
 }
 
 // Cancel waiting for opponent
@@ -496,9 +535,16 @@ function startOnlineGame(gameState, color) {
     UI.hide('waiting-room');
     UI.showScreen('game-screen');
 
-    // Update player status indicators
-    document.getElementById('white-status').textContent = color === 'white' ? '(You)' : '(Opponent)';
-    document.getElementById('black-status').textContent = color === 'black' ? '(You)' : '(Opponent)';
+    // Update player names and ELO
+    const whiteName = currentGamePlayers?.white?.username || 'White';
+    const blackName = currentGamePlayers?.black?.username || 'Black';
+    const whiteElo = currentGamePlayers?.white?.elo || '?';
+    const blackElo = currentGamePlayers?.black?.elo || '?';
+
+    document.querySelector('.player-white .player-name').textContent = whiteName;
+    document.querySelector('.player-black .player-name').textContent = blackName;
+    document.getElementById('white-status').textContent = `(${whiteElo})`;
+    document.getElementById('black-status').textContent = `(${blackElo})`;
 
     // Reorder header to match board perspective (opponent on left/top, you on right/bottom)
     const header = document.querySelector('.game-header');
@@ -812,13 +858,20 @@ function updateLobbyDisplay(games) {
         return;
     }
 
-    tablesList.innerHTML = availableGames.map(game => `
+    tablesList.innerHTML = availableGames.map(game => {
+        const creatorName = game.creator?.username || 'Anonymous';
+        const creatorElo = game.creator?.elo || '?';
+        return `
         <div class="table-item">
+            <div class="table-creator">
+                <span class="creator-name">${creatorName}</span>
+                <span class="creator-elo">(${creatorElo})</span>
+            </div>
             <div class="table-info">
                 <span class="table-time">${formatTimeControl(game.timeControl)}</span>
-                <span class="table-code">#${game.gameId}</span>
             </div>
             <button class="btn-join-table" onclick="joinTable('${game.gameId}')">Join</button>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }

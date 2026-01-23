@@ -110,6 +110,10 @@ const Auth = {
                 localStorage.setItem('authToken', data.token);
                 this.updateUI();
                 this.closeModal();
+                // Register with socket server
+                if (typeof registerPlayerWithServer === 'function') {
+                    registerPlayerWithServer();
+                }
             } else {
                 errorEl.textContent = data.error || 'Login failed';
                 errorEl.classList.remove('hidden');
@@ -156,6 +160,10 @@ const Auth = {
                 localStorage.setItem('authToken', data.token);
                 this.updateUI();
                 this.closeModal();
+                // Register with socket server
+                if (typeof registerPlayerWithServer === 'function') {
+                    registerPlayerWithServer();
+                }
             } else {
                 errorEl.textContent = data.error || 'Signup failed';
                 errorEl.classList.remove('hidden');
@@ -180,15 +188,32 @@ const Auth = {
         const authButtons = document.getElementById('auth-buttons');
         const userInfo = document.getElementById('user-info');
         const userDisplayName = document.getElementById('user-display-name');
+        const userEloDisplay = document.getElementById('user-elo-display');
 
         if (this.currentUser) {
             authButtons.classList.add('hidden');
             userInfo.classList.remove('hidden');
             userDisplayName.textContent = this.currentUser.username;
+            if (userEloDisplay) {
+                userEloDisplay.textContent = `(${this.currentUser.elo || 1500})`;
+            }
         } else {
             authButtons.classList.remove('hidden');
             userInfo.classList.add('hidden');
         }
+    },
+
+    // Update ELO (called when receiving eloUpdate from server)
+    updateElo(newElo) {
+        if (this.currentUser) {
+            this.currentUser.elo = newElo;
+            this.updateUI();
+        }
+    },
+
+    // Get current user's ELO
+    getElo() {
+        return this.currentUser?.elo || 1500;
     },
 
     // Get current user ID (for game tracking)

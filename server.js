@@ -11,6 +11,7 @@ const { KalasRandomChess } = require('./public/game-logic.js');
 // Import auth and database
 const { pool, initializeDatabase } = require('./db');
 const authRouter = require('./auth');
+const { calculateEloChanges } = require('./elo');
 
 const app = express();
 const server = http.createServer(app);
@@ -36,20 +37,62 @@ app.get('/verify', (req, res) => {
 const games = new Map();
 const playerGames = new Map(); // socket.id -> gameId
 const timerIntervals = new Map(); // gameId -> interval
+const playerInfo = new Map(); // socket.id -> { odUserId, username, elo }
 
 // Get list of waiting games for lobby
 function getWaitingGames() {
     const waitingGames = [];
     for (const [gameId, gameData] of games.entries()) {
         if (gameData.state === 'waiting') {
+            const creatorInfo = playerInfo.get(gameData.white);
             waitingGames.push({
                 gameId,
                 timeControl: gameData.timeControl,
-                createdAt: gameData.createdAt || Date.now()
+                createdAt: gameData.createdAt || Date.now(),
+                creator: creatorInfo ? {
+                    username: creatorInfo.username,
+                    elo: creatorInfo.elo
+                } : null
             });
         }
     }
     return waitingGames;
+}
+
+// Update player ELO in database
+async function updatePlayerElo(userId, newElo) {
+    try {
+        await pool.query('UPDATE users SET elo = $1 WHERE id = $2', [newElo, userId]);
+    } catch (err) {
+        console.error('Failed to update ELO:', err);
+    }
+}
+
+// Process game result and update ELOs
+async function processGameResult(gameData, winner) {
+    const whiteInfo = playerInfo.get(gameData.white);
+    const blackInfo = playerInfo.get(gameData.black);
+
+    // Only update ELO if both players are logged in
+    if (!whiteInfo?.userId || !blackInfo?.userId) {
+        console.log('Skipping ELO update - not all players logged in');
+        return null;
+    }
+
+    const result = winner === 'draw' ? 'draw' : winner;
+    const eloChanges = calculateEloChanges(whiteInfo.elo, blackInfo.elo, result);
+
+    // Update database
+    await updatePlayerElo(whiteInfo.userId, eloChanges.whiteNewElo);
+    await updatePlayerElo(blackInfo.userId, eloChanges.blackNewElo);
+
+    // Update local cache
+    whiteInfo.elo = eloChanges.whiteNewElo;
+    blackInfo.elo = eloChanges.blackNewElo;
+
+    console.log(`ELO updated: ${whiteInfo.username} ${eloChanges.whiteChange > 0 ? '+' : ''}${eloChanges.whiteChange}, ${blackInfo.username} ${eloChanges.blackChange > 0 ? '+' : ''}${eloChanges.blackChange}`);
+
+    return eloChanges;
 }
 
 // Broadcast lobby update to all connected clients
@@ -94,6 +137,20 @@ function startGameTimer(gameId) {
             // Notify both players
             io.to(gameData.white).emit('timeout', timeout);
             io.to(gameData.black).emit('timeout', timeout);
+
+            // Calculate and update ELO for timeout
+            processGameResult(gameData, timeout.winner).then(eloChanges => {
+                if (eloChanges) {
+                    io.to(gameData.white).emit('eloUpdate', {
+                        change: eloChanges.whiteChange,
+                        newElo: eloChanges.whiteNewElo
+                    });
+                    io.to(gameData.black).emit('eloUpdate', {
+                        change: eloChanges.blackChange,
+                        newElo: eloChanges.blackNewElo
+                    });
+                }
+            });
             return;
         }
 
@@ -126,6 +183,18 @@ io.on('connection', (socket) => {
     // Client requests lobby update
     socket.on('getLobby', () => {
         socket.emit('lobbyUpdate', { games: getWaitingGames() });
+    });
+
+    // Register player info (called when player logs in or page loads)
+    socket.on('registerPlayer', (data) => {
+        if (data && data.userId && data.username) {
+            playerInfo.set(socket.id, {
+                userId: data.userId,
+                username: data.username,
+                elo: data.elo || 1500
+            });
+            console.log(`Player registered: ${data.username} (ELO: ${data.elo})`);
+        }
     });
 
     // Create a new game
@@ -192,19 +261,28 @@ io.on('connection', (socket) => {
 
         // Notify both players
         const gameState = gameData.game.getState();
+        const whitePlayerInfo = playerInfo.get(gameData.white);
+        const blackPlayerInfo = playerInfo.get(gameData.black);
+
+        const players = {
+            white: whitePlayerInfo ? { username: whitePlayerInfo.username, elo: whitePlayerInfo.elo } : null,
+            black: blackPlayerInfo ? { username: blackPlayerInfo.username, elo: blackPlayerInfo.elo } : null
+        };
 
         // Notify the joining player
         socket.emit('gameJoined', {
             gameId,
             color: creatorIsWhite ? 'black' : 'white',
-            gameState
+            gameState,
+            players
         });
 
         // Notify the creating player
         io.to(creatorId).emit('gameStart', {
             gameId,
             color: creatorIsWhite ? 'white' : 'black',
-            gameState
+            gameState,
+            players
         });
 
         broadcastLobbyUpdate(); // Game is no longer waiting
@@ -266,6 +344,22 @@ io.on('connection', (socket) => {
         if (result.gameStatus && result.gameStatus.gameOver) {
             gameData.state = 'finished';
             stopGameTimer(gameId);
+
+            // Calculate and update ELO
+            const winner = result.gameStatus.result === 'stalemate' ? 'draw' : result.gameStatus.winner;
+            processGameResult(gameData, winner).then(eloChanges => {
+                if (eloChanges) {
+                    // Notify both players of ELO changes
+                    io.to(gameData.white).emit('eloUpdate', {
+                        change: eloChanges.whiteChange,
+                        newElo: eloChanges.whiteNewElo
+                    });
+                    io.to(gameData.black).emit('eloUpdate', {
+                        change: eloChanges.blackChange,
+                        newElo: eloChanges.blackNewElo
+                    });
+                }
+            });
         }
     });
 
@@ -300,6 +394,7 @@ io.on('connection', (socket) => {
 
         const playerColor = gameData.white === socket.id ? 'white' : 'black';
         const opponentId = playerColor === 'white' ? gameData.black : gameData.white;
+        const winner = playerColor === 'white' ? 'black' : 'white';
 
         gameData.state = 'finished';
         stopGameTimer(gameId);
@@ -307,6 +402,20 @@ io.on('connection', (socket) => {
 
         io.to(opponentId).emit('opponentResigned', {
             gameState: gameData.game.getState()
+        });
+
+        // Calculate and update ELO for resignation
+        processGameResult(gameData, winner).then(eloChanges => {
+            if (eloChanges) {
+                io.to(gameData.white).emit('eloUpdate', {
+                    change: eloChanges.whiteChange,
+                    newElo: eloChanges.whiteNewElo
+                });
+                io.to(gameData.black).emit('eloUpdate', {
+                    change: eloChanges.blackChange,
+                    newElo: eloChanges.blackNewElo
+                });
+            }
         });
     });
 
@@ -424,6 +533,18 @@ io.on('connection', (socket) => {
                                     message: `Opponent failed to reconnect. ${winner.charAt(0).toUpperCase() + winner.slice(1)} wins!`
                                 });
                             }
+
+                            // Calculate and update ELO for forfeit
+                            processGameResult(gameData, winner).then(eloChanges => {
+                                if (eloChanges && opponentId) {
+                                    const isOpponentWhite = gameData.white !== socket.id;
+                                    io.to(opponentId).emit('eloUpdate', {
+                                        change: isOpponentWhite ? eloChanges.whiteChange : eloChanges.blackChange,
+                                        newElo: isOpponentWhite ? eloChanges.whiteNewElo : eloChanges.blackNewElo
+                                    });
+                                }
+                            });
+
                             console.log(`Game ${gameId} forfeited due to disconnect timeout`);
                         }
                     }, 60000); // 60 second reconnect window
@@ -434,6 +555,14 @@ io.on('connection', (socket) => {
 
             playerGames.delete(socket.id);
         }
+
+        // Clean up player info after a delay (in case they reconnect)
+        setTimeout(() => {
+            // Only delete if no new game associated with this socket
+            if (!playerGames.has(socket.id)) {
+                playerInfo.delete(socket.id);
+            }
+        }, 120000); // 2 minute delay
     });
 });
 

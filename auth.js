@@ -39,9 +39,9 @@ router.post('/signup', async (req, res) => {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Insert user
+    // Insert user with default ELO of 1500
     const result = await pool.query(
-      `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username`,
+      `INSERT INTO users (username, password_hash, elo) VALUES ($1, $2, 1500) RETURNING id, username, elo`,
       [username, passwordHash]
     );
 
@@ -52,7 +52,7 @@ router.post('/signup', async (req, res) => {
 
     res.status(201).json({
       message: 'Account created successfully',
-      user: { id: user.id, username: user.username },
+      user: { id: user.id, username: user.username, elo: user.elo },
       token
     });
   } catch (err) {
@@ -71,7 +71,7 @@ router.post('/login', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'SELECT id, username, password_hash FROM users WHERE LOWER(username) = LOWER($1)',
+      'SELECT id, username, password_hash, elo FROM users WHERE LOWER(username) = LOWER($1)',
       [username]
     );
 
@@ -93,7 +93,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
     res.json({
-      user: { id: user.id, username: user.username },
+      user: { id: user.id, username: user.username, elo: user.elo || 1500 },
       token
     });
   } catch (err) {
@@ -114,7 +114,7 @@ router.get('/me', async (req, res) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const result = await pool.query(
-      'SELECT id, username, created_at FROM users WHERE id = $1',
+      'SELECT id, username, elo, created_at FROM users WHERE id = $1',
       [decoded.userId]
     );
 
@@ -127,6 +127,7 @@ router.get('/me', async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
+        elo: user.elo || 1500,
         createdAt: user.created_at
       }
     });
