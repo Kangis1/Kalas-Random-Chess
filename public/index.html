@@ -75,23 +75,39 @@
                     <button class="modal-close" id="profile-close">&times;</button>
                     <h2 id="profile-username">Player Stats</h2>
 
-                    <!-- Win/Loss/Draw Meter -->
+                    <!-- Win/Loss/Draw Table by Color -->
                     <div class="wld-section">
                         <h3>Record</h3>
-                        <div class="wld-stats">
-                            <div class="wld-stat wins">
-                                <span class="wld-count" id="stat-wins">0</span>
-                                <span class="wld-label">Wins</span>
-                            </div>
-                            <div class="wld-stat draws">
-                                <span class="wld-count" id="stat-draws">0</span>
-                                <span class="wld-label">Draws</span>
-                            </div>
-                            <div class="wld-stat losses">
-                                <span class="wld-count" id="stat-losses">0</span>
-                                <span class="wld-label">Losses</span>
-                            </div>
-                        </div>
+                        <table class="wld-table">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th class="win-col">Wins</th>
+                                    <th class="draw-col">Draws</th>
+                                    <th class="loss-col">Losses</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="color-label">As White</td>
+                                    <td class="win-col" id="stat-white-wins">0</td>
+                                    <td class="draw-col" id="stat-white-draws">0</td>
+                                    <td class="loss-col" id="stat-white-losses">0</td>
+                                </tr>
+                                <tr>
+                                    <td class="color-label">As Black</td>
+                                    <td class="win-col" id="stat-black-wins">0</td>
+                                    <td class="draw-col" id="stat-black-draws">0</td>
+                                    <td class="loss-col" id="stat-black-losses">0</td>
+                                </tr>
+                                <tr class="total-row">
+                                    <td class="color-label">Total</td>
+                                    <td class="win-col" id="stat-total-wins">0</td>
+                                    <td class="draw-col" id="stat-total-draws">0</td>
+                                    <td class="loss-col" id="stat-total-losses">0</td>
+                                </tr>
+                            </tbody>
+                        </table>
                         <div class="wld-bar">
                             <div class="wld-bar-wins" id="wld-bar-wins"></div>
                             <div class="wld-bar-draws" id="wld-bar-draws"></div>

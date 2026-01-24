@@ -1376,38 +1376,62 @@ body::before {
     margin-bottom: 30px;
 }
 
-.wld-stats {
-    display: flex;
-    justify-content: space-around;
+/* W/L/D Table */
+.wld-table {
+    width: 100%;
+    border-collapse: collapse;
     margin-bottom: 15px;
+    font-size: 1rem;
 }
 
-.wld-stat {
+.wld-table th,
+.wld-table td {
+    padding: 10px 8px;
     text-align: center;
 }
 
-.wld-count {
-    display: block;
-    font-size: 2rem;
-    font-weight: 700;
-}
-
-.wld-label {
+.wld-table th {
     font-size: 0.85rem;
     color: #888;
     text-transform: uppercase;
+    font-weight: 600;
+    border-bottom: 1px solid #34495e;
 }
 
-.wld-stat.wins .wld-count {
+.wld-table td {
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.wld-table .color-label {
+    text-align: left;
+    font-weight: 600;
+    font-size: 1rem;
+    color: #ccc;
+}
+
+.wld-table .win-col {
     color: #2ecc71;
 }
 
-.wld-stat.draws .wld-count {
+.wld-table .draw-col {
     color: #95a5a6;
 }
 
-.wld-stat.losses .wld-count {
+.wld-table .loss-col {
     color: #e74c3c;
+}
+
+.wld-table .total-row {
+    border-top: 1px solid #34495e;
+}
+
+.wld-table .total-row .color-label {
+    color: #9b59b6;
+}
+
+.wld-table .total-row td {
+    font-size: 1.5rem;
 }
 
 /* W/L/D Bar */

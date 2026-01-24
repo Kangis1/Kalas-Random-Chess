@@ -282,10 +282,12 @@ const Auth = {
         modal.classList.remove('hidden');
         document.getElementById('profile-username').textContent = this.currentUser?.username || 'Player Stats';
 
-        // Show loading state
-        document.getElementById('stat-wins').textContent = '-';
-        document.getElementById('stat-losses').textContent = '-';
-        document.getElementById('stat-draws').textContent = '-';
+        // Show loading state for all table cells
+        ['white', 'black', 'total'].forEach(color => {
+            document.getElementById(`stat-${color}-wins`).textContent = '-';
+            document.getElementById(`stat-${color}-draws`).textContent = '-';
+            document.getElementById(`stat-${color}-losses`).textContent = '-';
+        });
 
         try {
             const response = await fetch('/auth/stats', {
@@ -318,12 +320,20 @@ const Auth = {
         const wldSection = document.querySelector('.wld-section');
         const graphSection = document.querySelector('.elo-graph-section');
 
-        // Update W/L/D counts
-        document.getElementById('stat-wins').textContent = stats.wins;
-        document.getElementById('stat-losses').textContent = stats.losses;
-        document.getElementById('stat-draws').textContent = stats.draws;
+        // Update W/L/D table - by color
+        document.getElementById('stat-white-wins').textContent = stats.white.wins;
+        document.getElementById('stat-white-draws').textContent = stats.white.draws;
+        document.getElementById('stat-white-losses').textContent = stats.white.losses;
 
-        if (stats.totalGames === 0) {
+        document.getElementById('stat-black-wins').textContent = stats.black.wins;
+        document.getElementById('stat-black-draws').textContent = stats.black.draws;
+        document.getElementById('stat-black-losses').textContent = stats.black.losses;
+
+        document.getElementById('stat-total-wins').textContent = stats.total.wins;
+        document.getElementById('stat-total-draws').textContent = stats.total.draws;
+        document.getElementById('stat-total-losses').textContent = stats.total.losses;
+
+        if (stats.total.totalGames === 0) {
             // No games played
             noGamesMessage.classList.remove('hidden');
             wldSection.style.display = 'none';
@@ -336,10 +346,10 @@ const Auth = {
         graphSection.style.display = 'block';
 
         // Update W/L/D bar
-        const total = stats.totalGames;
-        const winPct = (stats.wins / total) * 100;
-        const drawPct = (stats.draws / total) * 100;
-        const lossPct = (stats.losses / total) * 100;
+        const total = stats.total.totalGames;
+        const winPct = (stats.total.wins / total) * 100;
+        const drawPct = (stats.total.draws / total) * 100;
+        const lossPct = (stats.total.losses / total) * 100;
 
         document.getElementById('wld-bar-wins').style.width = `${winPct}%`;
         document.getElementById('wld-bar-draws').style.width = `${drawPct}%`;

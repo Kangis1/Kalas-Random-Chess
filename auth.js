@@ -194,8 +194,12 @@ router.get('/stats', async (req, res) => {
       ORDER BY completed_at ASC
     `, [userId]);
 
-    // Calculate win/loss/draw stats
-    let wins = 0, losses = 0, draws = 0;
+    // Calculate win/loss/draw stats by color
+    const stats = {
+      white: { wins: 0, losses: 0, draws: 0 },
+      black: { wins: 0, losses: 0, draws: 0 },
+      total: { wins: 0, losses: 0, draws: 0, totalGames: 0 }
+    };
     const eloHistory = [];
 
     gamesResult.rows.forEach(game => {
@@ -203,11 +207,14 @@ router.get('/stats', async (req, res) => {
       const winner = game.winner;
 
       if (winner === 'draw' || game.result === 'stalemate') {
-        draws++;
+        stats[playedAs].draws++;
+        stats.total.draws++;
       } else if (winner === playedAs) {
-        wins++;
+        stats[playedAs].wins++;
+        stats.total.wins++;
       } else if (winner) {
-        losses++;
+        stats[playedAs].losses++;
+        stats.total.losses++;
       }
 
       // Build ELO history
@@ -222,14 +229,11 @@ router.get('/stats', async (req, res) => {
       }
     });
 
+    stats.total.totalGames = stats.total.wins + stats.total.losses + stats.total.draws;
+
     res.json({
       currentElo: userResult.rows[0].elo || 1500,
-      stats: {
-        wins,
-        losses,
-        draws,
-        totalGames: wins + losses + draws
-      },
+      stats,
       eloHistory
     });
   } catch (err) {
