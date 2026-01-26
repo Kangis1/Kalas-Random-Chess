@@ -88,21 +88,31 @@ function initializeSocket() {
     // Game joined successfully - sent to the player who clicked Join
     socket.on('gameJoined', (data) => {
         console.log('gameJoined received:', data.gameId, data.color);
-        currentGameId = data.gameId;
-        playerColor = data.color;
-        currentGamePlayers = data.players;
-        Sounds.opponentJoined();
-        startOnlineGame(data.gameState, data.color);
+        try {
+            currentGameId = data.gameId;
+            playerColor = data.color;
+            currentGamePlayers = data.players;
+            Sounds.opponentJoined();
+            startOnlineGame(data.gameState, data.color);
+        } catch (err) {
+            console.error('Error in gameJoined handler:', err);
+            alert('Error starting game: ' + err.message);
+        }
     });
 
     // Game started (both players connected) - sent to the creator when opponent joins
     socket.on('gameStart', (data) => {
         console.log('gameStart received:', data.gameId, 'currentGameId:', currentGameId);
-        currentGameId = data.gameId; // Ensure currentGameId is set (may have been cleared)
-        playerColor = data.color;
-        currentGamePlayers = data.players;
-        Sounds.opponentJoined();
-        startOnlineGame(data.gameState, data.color);
+        try {
+            currentGameId = data.gameId; // Ensure currentGameId is set (may have been cleared)
+            playerColor = data.color;
+            currentGamePlayers = data.players;
+            Sounds.opponentJoined();
+            startOnlineGame(data.gameState, data.color);
+        } catch (err) {
+            console.error('Error in gameStart handler:', err);
+            alert('Error starting game: ' + err.message);
+        }
     });
 
     // ELO update after game ends
@@ -539,20 +549,30 @@ function startLocalGame() {
 
 // Start online game
 function startOnlineGame(gameState, color) {
-    isLocalGame = false;
-    isAIGame = false;
-    playerColor = color;
-    ai = null;
+    console.log('startOnlineGame called with color:', color, 'gameState:', gameState);
 
-    game = new KalasRandomChess(gameState.timeControl || 10);
-    game.loadState(gameState);
+    try {
+        isLocalGame = false;
+        isAIGame = false;
+        playerColor = color;
+        ai = null;
 
-    // Save game for reconnection on refresh
-    saveActiveGame();
+        console.log('Creating KalasRandomChess instance...');
+        game = new KalasRandomChess(gameState.timeControl || 10);
+        console.log('Loading game state...');
+        game.loadState(gameState);
 
-    const boardElement = document.getElementById('chess-board');
-    boardUI = new ChessBoardUI(boardElement, game);
-    boardUI.setPlayerColor(color);
+        // Save game for reconnection on refresh
+        saveActiveGame();
+
+        console.log('Getting board element...');
+        const boardElement = document.getElementById('chess-board');
+        if (!boardElement) {
+            throw new Error('chess-board element not found!');
+        }
+        console.log('Creating ChessBoardUI...');
+        boardUI = new ChessBoardUI(boardElement, game);
+        boardUI.setPlayerColor(color);
 
     boardUI.onMove((result) => {
         // Play sound based on move type
@@ -585,42 +605,49 @@ function startOnlineGame(gameState, color) {
         Sounds.select();
     });
 
-    UI.updateGameInfo(game);
-    UI.hideGameMessage();
-    UI.hide('time-control-select');
-    UI.hide('waiting-room');
-    UI.showScreen('game-screen');
+        console.log('Updating UI...');
+        UI.updateGameInfo(game);
+        UI.hideGameMessage();
+        UI.hide('time-control-select');
+        UI.hide('waiting-room');
+        console.log('Switching to game-screen...');
+        UI.showScreen('game-screen');
 
-    // Update player names and ELO
-    const whiteName = currentGamePlayers?.white?.username || 'White';
-    const blackName = currentGamePlayers?.black?.username || 'Black';
-    const whiteElo = currentGamePlayers?.white?.elo || '?';
-    const blackElo = currentGamePlayers?.black?.elo || '?';
+        // Update player names and ELO
+        const whiteName = currentGamePlayers?.white?.username || 'White';
+        const blackName = currentGamePlayers?.black?.username || 'Black';
+        const whiteElo = currentGamePlayers?.white?.elo || '?';
+        const blackElo = currentGamePlayers?.black?.elo || '?';
 
-    document.querySelector('.player-white .player-name').textContent = whiteName;
-    document.querySelector('.player-black .player-name').textContent = blackName;
-    document.getElementById('white-status').textContent = `(${whiteElo})`;
-    document.getElementById('black-status').textContent = `(${blackElo})`;
+        document.querySelector('.player-white .player-name').textContent = whiteName;
+        document.querySelector('.player-black .player-name').textContent = blackName;
+        document.getElementById('white-status').textContent = `(${whiteElo})`;
+        document.getElementById('black-status').textContent = `(${blackElo})`;
 
-    // Reorder header to match board perspective (opponent on left/top, you on right/bottom)
-    const header = document.querySelector('.game-header');
-    const blackInfo = document.querySelector('.player-black');
-    const whiteInfo = document.querySelector('.player-white');
-    if (color === 'white') {
-        // White player: Black (opponent) should be first
-        header.insertBefore(blackInfo, whiteInfo);
-    } else {
-        // Black player: White (opponent) should be first
-        header.insertBefore(whiteInfo, blackInfo);
+        // Reorder header to match board perspective (opponent on left/top, you on right/bottom)
+        const header = document.querySelector('.game-header');
+        const blackInfo = document.querySelector('.player-black');
+        const whiteInfo = document.querySelector('.player-white');
+        if (color === 'white') {
+            // White player: Black (opponent) should be first
+            header.insertBefore(blackInfo, whiteInfo);
+        } else {
+            // Black player: White (opponent) should be first
+            header.insertBefore(whiteInfo, blackInfo);
+        }
+
+        // Initialize timers and captured pieces
+        updateTimerDisplay();
+        updateCapturedPieces();
+        game.startTimer();
+        startTimerInterval();
+
+        Sounds.gameStart();
+        console.log('startOnlineGame completed successfully!');
+    } catch (err) {
+        console.error('Error in startOnlineGame:', err);
+        alert('Failed to start game: ' + err.message);
     }
-
-    // Initialize timers and captured pieces
-    updateTimerDisplay();
-    updateCapturedPieces();
-    game.startTimer();
-    startTimerInterval();
-
-    Sounds.gameStart();
 }
 
 // Timer interval management

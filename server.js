@@ -292,14 +292,6 @@ io.on('connection', (socket) => {
         const creatorId = gameData.white; // Creator was temporarily stored as white
         console.log(`joinGame: creator socket ID is ${creatorId}`);
 
-        // Check if creator is still connected
-        const creatorSocket = io.sockets.sockets.get(creatorId);
-        if (!creatorSocket) {
-            console.log(`joinGame WARNING: creator socket ${creatorId} not found in connected sockets!`);
-        } else {
-            console.log(`joinGame: creator socket ${creatorId} is still connected`);
-        }
-
         if (creatorId === socket.id) {
             socket.emit('error', { message: 'Cannot join your own game' });
             return;
@@ -333,8 +325,8 @@ io.on('connection', (socket) => {
             black: blackPlayerInfo ? { username: blackPlayerInfo.username, elo: blackPlayerInfo.elo } : null
         };
 
-        // Notify the joining player
-        console.log(`Sending gameJoined to ${socket.id} for game ${gameId}`);
+        // Notify the joining player directly on their socket
+        console.log(`Sending gameJoined to joiner ${socket.id} for game ${gameId}`);
         socket.emit('gameJoined', {
             gameId,
             color: creatorIsWhite ? 'black' : 'white',
@@ -342,14 +334,19 @@ io.on('connection', (socket) => {
             players
         });
 
-        // Notify the creating player
-        console.log(`Sending gameStart to creator ${creatorId} for game ${gameId}`);
-        io.to(creatorId).emit('gameStart', {
-            gameId,
-            color: creatorIsWhite ? 'white' : 'black',
-            gameState,
-            players
-        });
+        // Notify the creating player - get their socket directly
+        const creatorSocket = io.sockets.sockets.get(creatorId);
+        if (creatorSocket) {
+            console.log(`Sending gameStart directly to creator socket ${creatorId} for game ${gameId}`);
+            creatorSocket.emit('gameStart', {
+                gameId,
+                color: creatorIsWhite ? 'white' : 'black',
+                gameState,
+                players
+            });
+        } else {
+            console.error(`ERROR: Creator socket ${creatorId} not found! Cannot send gameStart.`);
+        }
 
         broadcastLobbyUpdate(); // Game is no longer waiting
         console.log(`Player ${socket.id} joined game ${gameId}`);
