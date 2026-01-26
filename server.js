@@ -144,7 +144,9 @@ async function processGameResult(gameId, gameData, winner) {
 
 // Broadcast lobby update to all connected clients
 function broadcastLobbyUpdate() {
-    io.emit('lobbyUpdate', { games: getWaitingGames() });
+    const waitingGames = getWaitingGames();
+    console.log('Broadcasting lobby update:', waitingGames.length, 'waiting games', waitingGames.map(g => g.gameId));
+    io.emit('lobbyUpdate', { games: waitingGames });
 }
 
 // Generate random 6-character game code
@@ -251,6 +253,8 @@ io.on('connection', (socket) => {
         const game = new KalasRandomChess(timeControl);
         game.generateStartingPosition();
 
+        console.log(`Creating game ${gameId} for socket ${socket.id}`);
+
         games.set(gameId, {
             game: game,
             white: socket.id,
@@ -265,24 +269,37 @@ io.on('connection', (socket) => {
 
         socket.emit('gameCreated', { gameId, timeControl });
         broadcastLobbyUpdate(); // Notify all clients about new game
-        console.log(`Game created: ${gameId} by ${socket.id} (${timeControl} min)`);
+        console.log(`Game created: ${gameId} by ${socket.id} (${timeControl} min), stored creatorId: ${games.get(gameId).white}`);
     });
 
     // Join an existing game
     socket.on('joinGame', ({ gameId }) => {
+        console.log(`joinGame request: gameId=${gameId}, joiner=${socket.id}`);
         const gameData = games.get(gameId);
 
         if (!gameData) {
+            console.log(`joinGame failed: game ${gameId} not found`);
             socket.emit('error', { message: 'Game not found' });
             return;
         }
 
         if (gameData.state !== 'waiting') {
+            console.log(`joinGame failed: game ${gameId} state is ${gameData.state}`);
             socket.emit('error', { message: 'Game already in progress' });
             return;
         }
 
         const creatorId = gameData.white; // Creator was temporarily stored as white
+        console.log(`joinGame: creator socket ID is ${creatorId}`);
+
+        // Check if creator is still connected
+        const creatorSocket = io.sockets.sockets.get(creatorId);
+        if (!creatorSocket) {
+            console.log(`joinGame WARNING: creator socket ${creatorId} not found in connected sockets!`);
+        } else {
+            console.log(`joinGame: creator socket ${creatorId} is still connected`);
+        }
+
         if (creatorId === socket.id) {
             socket.emit('error', { message: 'Cannot join your own game' });
             return;
@@ -317,6 +334,7 @@ io.on('connection', (socket) => {
         };
 
         // Notify the joining player
+        console.log(`Sending gameJoined to ${socket.id} for game ${gameId}`);
         socket.emit('gameJoined', {
             gameId,
             color: creatorIsWhite ? 'black' : 'white',
@@ -325,6 +343,7 @@ io.on('connection', (socket) => {
         });
 
         // Notify the creating player
+        console.log(`Sending gameStart to creator ${creatorId} for game ${gameId}`);
         io.to(creatorId).emit('gameStart', {
             gameId,
             color: creatorIsWhite ? 'white' : 'black',

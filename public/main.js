@@ -85,8 +85,9 @@ function initializeSocket() {
         UI.show('waiting-room');
     });
 
-    // Game joined successfully
+    // Game joined successfully - sent to the player who clicked Join
     socket.on('gameJoined', (data) => {
+        console.log('gameJoined received:', data.gameId, data.color);
         currentGameId = data.gameId;
         playerColor = data.color;
         currentGamePlayers = data.players;
@@ -94,8 +95,10 @@ function initializeSocket() {
         startOnlineGame(data.gameState, data.color);
     });
 
-    // Game started (both players connected)
+    // Game started (both players connected) - sent to the creator when opponent joins
     socket.on('gameStart', (data) => {
+        console.log('gameStart received:', data.gameId, 'currentGameId:', currentGameId);
+        currentGameId = data.gameId; // Ensure currentGameId is set (may have been cleared)
         playerColor = data.color;
         currentGamePlayers = data.players;
         Sounds.opponentJoined();
@@ -235,14 +238,17 @@ function initializeSocket() {
 
     // Error handling
     socket.on('error', (data) => {
+        console.error('Socket error received:', data.message);
         Sounds.invalid();
         alert(data.message);
         UI.hide('waiting-room');
         UI.hide('create-table-form');
+        UI.show('main-lobby'); // Make sure lobby is shown after error
     });
 
     // Lobby updates
     socket.on('lobbyUpdate', (data) => {
+        console.log('lobbyUpdate received:', data.games.length, 'games', data.games);
         updateLobbyDisplay(data.games);
     });
 }
@@ -915,6 +921,7 @@ function createTableAndJoinLobby() {
 
 // Join a table from lobby
 function joinTable(gameId) {
+    console.log('joinTable called with gameId:', gameId);
     socket.emit('joinGame', { gameId });
 }
 
