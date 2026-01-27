@@ -605,13 +605,13 @@ function startOnlineGame(gameState, color) {
         Sounds.select();
     });
 
+        console.log('Switching to game-screen...');
+        UI.hide('waiting-room');
+        UI.showScreen('game-screen');
+
         console.log('Updating UI...');
         UI.updateGameInfo(game);
         UI.hideGameMessage();
-        UI.hide('time-control-select');
-        UI.hide('waiting-room');
-        console.log('Switching to game-screen...');
-        UI.showScreen('game-screen');
 
         // Update player names and ELO
         const whiteName = currentGamePlayers?.white?.username || 'White';
