@@ -44,15 +44,16 @@ function getWaitingGames() {
     const waitingGames = [];
     for (const [gameId, gameData] of games.entries()) {
         if (gameData.state === 'waiting') {
-            const creatorInfo = playerInfo.get(gameData.white);
+            // Try live playerInfo first, fall back to stored creator info
+            const liveInfo = playerInfo.get(gameData.white);
+            const creator = liveInfo
+                ? { username: liveInfo.username, elo: liveInfo.elo }
+                : gameData.creatorInfo || null;
             waitingGames.push({
                 gameId,
                 timeControl: gameData.timeControl,
                 createdAt: gameData.createdAt || Date.now(),
-                creator: creatorInfo ? {
-                    username: creatorInfo.username,
-                    elo: creatorInfo.elo
-                } : null
+                creator
             });
         }
     }
@@ -252,15 +253,20 @@ io.on('connection', (socket) => {
                     const oldCreatorId = gameData.white;
                     const oldSocket = io.sockets.sockets.get(oldCreatorId);
                     if (!oldSocket || !oldSocket.connected) {
-                        // Check if this is the same user by matching userId
+                        // Match by stored creatorUserId (reliable) or by playerInfo userId (fallback)
                         const oldInfo = playerInfo.get(oldCreatorId);
-                        if (oldInfo && oldInfo.userId === data.userId) {
+                        const isMatch = gameData.creatorUserId === data.userId ||
+                            (oldInfo && oldInfo.userId === data.userId);
+                        if (isMatch) {
                             console.log(`Updating stale waiting game ${gameId} creator socket: ${oldCreatorId} -> ${socket.id}`);
                             playerGames.delete(oldCreatorId);
                             playerInfo.delete(oldCreatorId);
                             gameData.white = socket.id;
                             playerGames.set(socket.id, gameId);
                             socket.join(gameId);
+                            // Update stored creator info with fresh data
+                            gameData.creatorInfo = { username: data.username, elo: data.elo || 1500 };
+                            broadcastLobbyUpdate(); // Refresh lobby so creator name shows correctly
                         }
                     }
                 }
@@ -277,13 +283,17 @@ io.on('connection', (socket) => {
 
         console.log(`Creating game ${gameId} for socket ${socket.id}`);
 
+        // Store creator info directly so it survives socket reconnections
+        const creator = playerInfo.get(socket.id);
         games.set(gameId, {
             game: game,
             white: socket.id,
             black: null,
             state: 'waiting', // waiting, playing, finished
             timeControl: timeControl,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            creatorUserId: creator?.userId || null,
+            creatorInfo: creator ? { username: creator.username, elo: creator.elo } : null
         });
 
         playerGames.set(socket.id, gameId);
