@@ -198,6 +198,21 @@ function initializeSocket() {
             UI.updateGameInfo(game);
             updateTimerDisplay();
             updateCapturedPieces();
+
+            // If the game is actually over (e.g. we missed the checkmate move), handle it
+            if (data.gameState.gameOver && !game.gameOver) {
+                // loadState already set gameOver, but trigger the UI
+            }
+            if (game.gameOver) {
+                handleGameEnd({
+                    gameOver: true,
+                    result: game.winner ? 'checkmate' : 'stalemate',
+                    winner: game.winner,
+                    message: game.winner
+                        ? `${game.winner.charAt(0).toUpperCase() + game.winner.slice(1)} wins!`
+                        : 'Draw!'
+                });
+            }
         }
     });
 
@@ -294,9 +309,9 @@ function initializeSocket() {
     socket.on('moveError', (data) => {
         console.error('Move error:', data.message);
         Sounds.invalid();
-        // If it's "Not your turn", we may be desynced - request a full sync
-        if (data.message === 'Not your turn' && currentGameId) {
-            console.log('Possible desync detected, requesting full state sync...');
+        // Any move error means our local state is wrong - request a full sync to fix it
+        if (currentGameId) {
+            console.log('Move rejected by server, requesting full state sync...');
             socket.emit('requestSync', { gameId: currentGameId });
         }
     });
