@@ -243,6 +243,28 @@ io.on('connection', (socket) => {
                 elo: data.elo || 1500
             });
             console.log(`Player registered: ${data.username} (ELO: ${data.elo})`);
+
+            // If this player has an active game under a stale socket ID, update it
+            // This handles the case where the socket reconnected while waiting/playing
+            for (const [gameId, gameData] of games.entries()) {
+                if (gameData.state === 'waiting' && gameData.white !== socket.id) {
+                    // Check if the old creator socket is dead
+                    const oldCreatorId = gameData.white;
+                    const oldSocket = io.sockets.sockets.get(oldCreatorId);
+                    if (!oldSocket || !oldSocket.connected) {
+                        // Check if this is the same user by matching userId
+                        const oldInfo = playerInfo.get(oldCreatorId);
+                        if (oldInfo && oldInfo.userId === data.userId) {
+                            console.log(`Updating stale waiting game ${gameId} creator socket: ${oldCreatorId} -> ${socket.id}`);
+                            playerGames.delete(oldCreatorId);
+                            playerInfo.delete(oldCreatorId);
+                            gameData.white = socket.id;
+                            playerGames.set(socket.id, gameId);
+                            socket.join(gameId);
+                        }
+                    }
+                }
+            }
         }
     });
 
@@ -357,19 +379,19 @@ io.on('connection', (socket) => {
         const gameData = games.get(gameId);
 
         if (!gameData) {
-            socket.emit('error', { message: 'Game not found' });
+            socket.emit('moveError', { message: 'Game not found' });
             return;
         }
 
         if (gameData.state !== 'playing') {
-            socket.emit('error', { message: 'Game not in progress' });
+            socket.emit('moveError', { message: 'Game not in progress' });
             return;
         }
 
         // Verify it's this player's turn
         const playerColor = gameData.white === socket.id ? 'white' : 'black';
         if (gameData.game.currentTurn !== playerColor) {
-            socket.emit('error', { message: 'Not your turn' });
+            socket.emit('moveError', { message: 'Not your turn' });
             return;
         }
 
@@ -380,12 +402,16 @@ io.on('connection', (socket) => {
         const result = gameData.game.makeMove(move.from, move.to);
 
         if (!result.success) {
-            socket.emit('error', { message: result.error });
+            socket.emit('moveError', { message: result.error });
             return;
         }
 
         // Reset timestamp for the new player's turn
         gameData.game.lastTimestamp = Date.now();
+
+        // Track move number for acknowledgment
+        gameData.moveCount = (gameData.moveCount || 0) + 1;
+        const moveNum = gameData.moveCount;
 
         const gameState = gameData.game.getState();
 
@@ -395,13 +421,48 @@ io.on('connection', (socket) => {
             gameStatus: result.gameStatus
         });
 
-        // Broadcast to opponent
+        // Broadcast to opponent with retry logic
         const opponentId = playerColor === 'white' ? gameData.black : gameData.white;
-        console.log(`Move made by ${playerColor} (${socket.id}), sending to opponent ${opponentId}`);
+        console.log(`Move #${moveNum} made by ${playerColor} (${socket.id}), sending to opponent ${opponentId}`);
+
+        // Store pending move for retry
+        if (!gameData.pendingMoves) gameData.pendingMoves = new Map();
+        gameData.pendingMoves.set(moveNum, {
+            gameState,
+            gameStatus: result.gameStatus,
+            moveNum,
+            retries: 0
+        });
+
+        // Send to opponent
         io.to(opponentId).emit('moveMade', {
             gameState: gameState,
-            gameStatus: result.gameStatus
+            gameStatus: result.gameStatus,
+            moveNum: moveNum
         });
+
+        // Set up retry - if not acknowledged within 2 seconds, resend
+        const retryInterval = setInterval(() => {
+            const pending = gameData.pendingMoves?.get(moveNum);
+            if (!pending) {
+                clearInterval(retryInterval);
+                return;
+            }
+            pending.retries++;
+            if (pending.retries > 5) {
+                // After 5 retries (10 seconds), stop retrying - opponent will sync via requestSync
+                console.log(`Move #${moveNum} not acknowledged after 5 retries, giving up retry`);
+                gameData.pendingMoves.delete(moveNum);
+                clearInterval(retryInterval);
+                return;
+            }
+            console.log(`Retrying move #${moveNum} to opponent ${opponentId} (attempt ${pending.retries})`);
+            io.to(opponentId).emit('moveMade', {
+                gameState: pending.gameState,
+                gameStatus: pending.gameStatus,
+                moveNum: moveNum
+            });
+        }, 2000);
 
         // Check if game is over
         if (result.gameStatus && result.gameStatus.gameOver) {
@@ -424,6 +485,55 @@ io.on('connection', (socket) => {
                 }
             });
         }
+    });
+
+    // Acknowledge receipt of a move (stops retry)
+    socket.on('moveAck', ({ gameId, moveNum }) => {
+        const gameData = games.get(gameId);
+        if (gameData && gameData.pendingMoves) {
+            gameData.pendingMoves.delete(moveNum);
+        }
+    });
+
+    // Client requests full state sync (recovery from desync)
+    socket.on('requestSync', ({ gameId }) => {
+        const gameData = games.get(gameId);
+        if (!gameData || gameData.state === 'finished') return;
+
+        // Check if this socket is a known player, or if it's a reconnected socket with a new ID
+        let playerColor;
+        if (gameData.white === socket.id) {
+            playerColor = 'white';
+        } else if (gameData.black === socket.id) {
+            playerColor = 'black';
+        } else {
+            // Socket ID doesn't match either player - check if either player's socket is dead
+            const whiteSocket = io.sockets.sockets.get(gameData.white);
+            const blackSocket = io.sockets.sockets.get(gameData.black);
+
+            if (!whiteSocket || !whiteSocket.connected) {
+                playerColor = 'white';
+                console.log(`requestSync: updating stale white socket ${gameData.white} -> ${socket.id} for game ${gameId}`);
+                gameData.white = socket.id;
+            } else if (!blackSocket || !blackSocket.connected) {
+                playerColor = 'black';
+                console.log(`requestSync: updating stale black socket ${gameData.black} -> ${socket.id} for game ${gameId}`);
+                gameData.black = socket.id;
+            } else {
+                console.log(`requestSync: unknown socket ${socket.id} for game ${gameId}, ignoring`);
+                return;
+            }
+            playerGames.set(socket.id, gameId);
+            socket.join(gameId);
+        }
+
+        const gameState = gameData.game.getState();
+        console.log(`State sync requested by ${playerColor} (${socket.id}) for game ${gameId}`);
+
+        socket.emit('fullSync', {
+            gameState: gameState,
+            moveCount: gameData.moveCount || 0
+        });
     });
 
     // Handle timeout notification from client
@@ -499,8 +609,51 @@ io.on('connection', (socket) => {
     socket.on('reconnectGame', ({ gameId }) => {
         const gameData = games.get(gameId);
 
-        if (!gameData || gameData.state !== 'paused') {
-            socket.emit('error', { message: 'Game not found or not paused' });
+        if (!gameData) {
+            socket.emit('reconnectError', { message: 'Game not found' });
+            return;
+        }
+
+        if (gameData.state === 'finished') {
+            socket.emit('reconnectError', { message: 'Game is already finished' });
+            return;
+        }
+
+        // Handle fast reconnect - game is still 'playing' but socket ID is stale
+        if (gameData.state === 'playing') {
+            // Figure out which player this is by checking localStorage-saved color
+            // The old socket ID is gone, so check if either slot has a dead socket
+            const whiteSocket = io.sockets.sockets.get(gameData.white);
+            const blackSocket = io.sockets.sockets.get(gameData.black);
+
+            let playerColor = null;
+            if (!whiteSocket || !whiteSocket.connected) {
+                playerColor = 'white';
+                gameData.white = socket.id;
+            } else if (!blackSocket || !blackSocket.connected) {
+                playerColor = 'black';
+                gameData.black = socket.id;
+            } else {
+                // Both sockets are still alive - this might be a duplicate tab or stale localStorage
+                socket.emit('reconnectError', { message: 'Game already has both players connected' });
+                return;
+            }
+
+            console.log(`Fast reconnect: updating ${playerColor} socket to ${socket.id} for game ${gameId}`);
+            playerGames.set(socket.id, gameId);
+            socket.join(gameId);
+
+            const gameState = gameData.game.getState();
+            socket.emit('gameReconnected', {
+                gameId,
+                color: playerColor,
+                gameState
+            });
+            return;
+        }
+
+        if (gameData.state !== 'paused') {
+            socket.emit('reconnectError', { message: 'Game not found or not paused' });
             return;
         }
 
@@ -509,7 +662,7 @@ io.on('connection', (socket) => {
         const isBlack = gameData.disconnectedPlayer === 'black';
 
         if (!isWhite && !isBlack) {
-            socket.emit('error', { message: 'No disconnected player to replace' });
+            socket.emit('reconnectError', { message: 'No disconnected player to replace' });
             return;
         }
 

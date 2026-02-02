@@ -13,6 +13,7 @@ let selectedTimeControl = 10; // Default 10 minutes
 let timerInterval = null;
 let aiThinking = false;
 let currentGamePlayers = null; // { white: { username, elo }, black: { username, elo } }
+let lastReceivedMoveNum = 0; // Track last received move for dedup
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
@@ -68,8 +69,15 @@ function initializeSocket() {
         console.log('Connected to server');
         // Register player info if logged in
         registerPlayerWithServer();
-        // Check for active game after connection is established
-        checkForActiveGame();
+
+        if (currentGameId && game && !game.gameOver) {
+            // We're in an active game and just reconnected - sync state and fix socket ID
+            console.log('Reconnected during active game, requesting state sync...');
+            socket.emit('requestSync', { gameId: currentGameId });
+        } else {
+            // Not in a game - check localStorage for a game to rejoin (e.g. after page refresh)
+            checkForActiveGame();
+        }
     });
 
     socket.on('disconnect', () => {
@@ -144,6 +152,20 @@ function initializeSocket() {
     socket.on('moveMade', (data) => {
         console.log('Received moveMade from server:', data);
         if (boardUI && game) {
+            // Acknowledge receipt so server stops retrying
+            if (data.moveNum && currentGameId) {
+                socket.emit('moveAck', { gameId: currentGameId, moveNum: data.moveNum });
+            }
+
+            // Skip if we already have this move (duplicate from retry)
+            if (data.moveNum && data.moveNum <= lastReceivedMoveNum) {
+                console.log(`Skipping duplicate move #${data.moveNum} (already have #${lastReceivedMoveNum})`);
+                return;
+            }
+            if (data.moveNum) {
+                lastReceivedMoveNum = data.moveNum;
+            }
+
             const wasCapture = data.gameState.moveHistory.length > 0 &&
                 data.gameState.moveHistory[data.gameState.moveHistory.length - 1].captured;
 
@@ -164,6 +186,18 @@ function initializeSocket() {
             if (data.gameStatus && data.gameStatus.gameOver) {
                 handleGameEnd(data.gameStatus);
             }
+        }
+    });
+
+    // Full state sync from server (recovery from desync)
+    socket.on('fullSync', (data) => {
+        console.log('Received fullSync from server');
+        if (boardUI && game) {
+            lastReceivedMoveNum = data.moveCount || 0;
+            boardUI.updateFromState(data.gameState);
+            UI.updateGameInfo(game);
+            updateTimerDisplay();
+            updateCapturedPieces();
         }
     });
 
@@ -246,14 +280,35 @@ function initializeSocket() {
         startOnlineGame(data.gameState, data.color);
     });
 
-    // Error handling
+    // Reconnect errors (don't kick to lobby - game may still be active)
+    socket.on('reconnectError', (data) => {
+        console.warn('Reconnect error:', data.message);
+        // Clear stale saved game if the game is truly gone
+        if (data.message === 'Game not found' || data.message === 'Game is already finished') {
+            clearActiveGame();
+        }
+        // Don't show alert or kick to lobby - the player may still be in an active game
+    });
+
+    // Move-specific errors (don't kick to lobby)
+    socket.on('moveError', (data) => {
+        console.error('Move error:', data.message);
+        Sounds.invalid();
+        // If it's "Not your turn", we may be desynced - request a full sync
+        if (data.message === 'Not your turn' && currentGameId) {
+            console.log('Possible desync detected, requesting full state sync...');
+            socket.emit('requestSync', { gameId: currentGameId });
+        }
+    });
+
+    // Lobby/join errors (return to lobby)
     socket.on('error', (data) => {
         console.error('Socket error received:', data.message);
         Sounds.invalid();
         alert(data.message);
         UI.hide('waiting-room');
         UI.hide('create-table-form');
-        UI.show('main-lobby'); // Make sure lobby is shown after error
+        UI.show('main-lobby');
     });
 
     // Lobby updates
@@ -887,6 +942,7 @@ function returnToMenu() {
     isAIGame = false;
     ai = null;
     aiThinking = false;
+    lastReceivedMoveNum = 0;
 
     UI.hide('waiting-room');
     UI.hide('create-table-form');
