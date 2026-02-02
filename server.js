@@ -264,6 +264,11 @@ io.on('connection', (socket) => {
                             gameData.white = socket.id;
                             playerGames.set(socket.id, gameId);
                             socket.join(gameId);
+                            // Clear disconnect timeout since creator is back
+                            if (gameData.disconnectTimeout) {
+                                clearTimeout(gameData.disconnectTimeout);
+                                delete gameData.disconnectTimeout;
+                            }
                             // Update stored creator info with fresh data
                             gameData.creatorInfo = { username: data.username, elo: data.elo || 1500 };
                             broadcastLobbyUpdate(); // Refresh lobby so creator name shows correctly
@@ -725,9 +730,20 @@ io.on('connection', (socket) => {
 
             if (gameData) {
                 if (gameData.state === 'waiting') {
-                    // Delete waiting game
-                    games.delete(gameId);
-                    broadcastLobbyUpdate(); // Game removed from lobby
+                    // Don't delete immediately - give creator time to reconnect
+                    // The registerPlayer handler will reclaim the game on reconnect
+                    gameData.disconnectTimeout = setTimeout(() => {
+                        // If game is still waiting and socket is still dead, delete it
+                        if (gameData.state === 'waiting') {
+                            const currentSocket = io.sockets.sockets.get(gameData.white);
+                            if (!currentSocket || !currentSocket.connected) {
+                                games.delete(gameId);
+                                playerGames.delete(gameData.white);
+                                broadcastLobbyUpdate();
+                                console.log(`Waiting game ${gameId} deleted after creator disconnect timeout`);
+                            }
+                        }
+                    }, 15000); // 15 second grace period for reconnect
                 } else if (gameData.state === 'playing') {
                     // Pause the game and allow reconnection
                     stopGameTimer(gameId);
