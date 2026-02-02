@@ -10,6 +10,7 @@ class ChessBoardUI {
         this.flipped = false;
         this.onMoveCallback = null;
         this.onSelectCallback = null;
+        this.viewingHistory = false;
     }
 
     // Set callback for when a piece is selected
@@ -99,6 +100,7 @@ class ChessBoardUI {
     // Handle square click
     handleSquareClick(index) {
         if (this.game.gameOver) return;
+        if (this.viewingHistory) return;
 
         // In online mode, only allow moves on player's turn
         if (this.playerColor && this.playerColor !== this.game.currentTurn) {
@@ -174,6 +176,55 @@ class ChessBoardUI {
     updateFromState(state) {
         this.game.loadState(state);
         this.clearSelection();
+    }
+
+    // Display a historical board position (read-only, no game state change)
+    displayPosition(board, lastMove) {
+        this.viewingHistory = true;
+        this.boardElement.innerHTML = '';
+
+        for (let visualRow = 7; visualRow >= 0; visualRow--) {
+            for (let visualCol = 0; visualCol < 8; visualCol++) {
+                const actualRow = this.flipped ? 7 - visualRow : visualRow;
+                const actualCol = this.flipped ? 7 - visualCol : visualCol;
+                const index = actualRow * 8 + actualCol;
+
+                const square = document.createElement('div');
+                square.className = 'square';
+                square.dataset.index = index;
+
+                const isLightSquare = (actualRow + actualCol) % 2 === 1;
+                square.classList.add(isLightSquare ? 'light' : 'dark');
+
+                const piece = board[index];
+                if (piece) {
+                    const pieceSpan = document.createElement('span');
+                    pieceSpan.className = 'piece';
+                    if (this.game.isWhitePiece(piece)) {
+                        pieceSpan.classList.add('white-piece');
+                    } else if (this.game.isBlackPiece(piece)) {
+                        pieceSpan.classList.add('black-piece');
+                    }
+                    pieceSpan.textContent = PIECE_GLYPHS[piece] || piece;
+                    square.appendChild(pieceSpan);
+                }
+
+                // Highlight last move
+                if (lastMove) {
+                    if (index === lastMove.from || index === lastMove.to) {
+                        square.classList.add('last-move');
+                    }
+                }
+
+                this.boardElement.appendChild(square);
+            }
+        }
+    }
+
+    // Return to live board view
+    returnToLive() {
+        this.viewingHistory = false;
+        this.render();
     }
 }
 

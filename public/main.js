@@ -14,6 +14,8 @@ let timerInterval = null;
 let aiThinking = false;
 let currentGamePlayers = null; // { white: { username, elo }, black: { username, elo } }
 let lastReceivedMoveNum = 0; // Track last received move for dedup
+let initialBoard = null; // Starting board position for history replay
+let viewingMoveIndex = null; // null = live, 0 = start, N = after move N
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
@@ -141,6 +143,7 @@ function initializeSocket() {
             UI.updateGameInfo(game);
             updateTimerDisplay();
             updateCapturedPieces();
+            updateMoveNavButtons();
 
             if (data.gameStatus && data.gameStatus.gameOver) {
                 handleGameEnd(data.gameStatus);
@@ -169,10 +172,26 @@ function initializeSocket() {
             const wasCapture = data.gameState.moveHistory.length > 0 &&
                 data.gameState.moveHistory[data.gameState.moveHistory.length - 1].captured;
 
+            // If browsing history, save the viewed index before state update
+            const wasViewingHistory = viewingMoveIndex !== null;
+            const savedViewIndex = viewingMoveIndex;
+
             boardUI.updateFromState(data.gameState);
             UI.updateGameInfo(game);
             updateTimerDisplay();
             updateCapturedPieces();
+
+            // If was browsing history, stay at that position
+            if (wasViewingHistory) {
+                viewingMoveIndex = savedViewIndex;
+                const board = reconstructBoardAtMove(viewingMoveIndex);
+                const lastMoveAtView = viewingMoveIndex > 0 ? {
+                    from: game.moveHistory[viewingMoveIndex - 1].from,
+                    to: game.moveHistory[viewingMoveIndex - 1].to
+                } : null;
+                boardUI.displayPosition(board, lastMoveAtView);
+            }
+            updateMoveNavButtons();
 
             // Play appropriate sound
             if (data.gameStatus && data.gameStatus.inCheck) {
@@ -194,10 +213,12 @@ function initializeSocket() {
         console.log('Received fullSync from server');
         if (boardUI && game) {
             lastReceivedMoveNum = data.moveCount || 0;
+            viewingMoveIndex = null;
             boardUI.updateFromState(data.gameState);
             UI.updateGameInfo(game);
             updateTimerDisplay();
             updateCapturedPieces();
+            updateMoveNavButtons();
 
             // If the game is actually over (e.g. we missed the checkmate move), handle it
             if (data.gameState.gameOver && !game.gameOver) {
@@ -390,6 +411,12 @@ function initializeEventListeners() {
     document.getElementById('btn-resign').addEventListener('click', resignGame);
     document.getElementById('btn-new-game').addEventListener('click', returnToMenu);
 
+    // Move history navigation
+    document.getElementById('btn-move-first').addEventListener('click', () => navigateMove('first'));
+    document.getElementById('btn-move-prev').addEventListener('click', () => navigateMove('prev'));
+    document.getElementById('btn-move-next').addEventListener('click', () => navigateMove('next'));
+    document.getElementById('btn-move-last').addEventListener('click', () => navigateMove('last'));
+
     // Sound toggle
     document.getElementById('sound-toggle').addEventListener('click', toggleSound);
     // Initialize sound toggle icon based on saved preference
@@ -465,6 +492,8 @@ function startAIGame() {
 
     game = new KalasRandomChess(selectedTimeControl);
     game.generateStartingPosition();
+    initialBoard = [...game.board];
+    viewingMoveIndex = null;
 
     const boardElement = document.getElementById('chess-board');
     boardUI = new ChessBoardUI(boardElement, game);
@@ -483,6 +512,8 @@ function startAIGame() {
         UI.updateGameInfo(game);
         updateTimerDisplay();
         updateCapturedPieces();
+        viewingMoveIndex = null; // Return to live view on move
+        updateMoveNavButtons();
 
         if (result.gameStatus && result.gameStatus.gameOver) {
             handleGameEnd(result.gameStatus);
@@ -514,6 +545,7 @@ function startAIGame() {
     startTimerInterval();
 
     Sounds.gameStart();
+    updateMoveNavButtons();
 }
 
 // Make AI move
@@ -548,6 +580,7 @@ async function makeAIMove() {
                 UI.updateGameInfo(game);
                 updateTimerDisplay();
                 updateCapturedPieces();
+                updateMoveNavButtons();
 
                 if (result.gameStatus && result.gameStatus.gameOver) {
                     handleGameEnd(result.gameStatus);
@@ -571,6 +604,8 @@ function startLocalGame() {
 
     game = new KalasRandomChess(selectedTimeControl);
     game.generateStartingPosition();
+    initialBoard = [...game.board];
+    viewingMoveIndex = null;
 
     const boardElement = document.getElementById('chess-board');
     boardUI = new ChessBoardUI(boardElement, game);
@@ -588,6 +623,8 @@ function startLocalGame() {
 
         UI.updateGameInfo(game);
         updateCapturedPieces();
+        viewingMoveIndex = null;
+        updateMoveNavButtons();
 
         if (result.gameStatus && result.gameStatus.gameOver) {
             handleGameEnd(result.gameStatus);
@@ -615,6 +652,7 @@ function startLocalGame() {
     startTimerInterval();
 
     Sounds.gameStart();
+    updateMoveNavButtons();
 }
 
 // Start online game
@@ -631,6 +669,20 @@ function startOnlineGame(gameState, color) {
         game = new KalasRandomChess(gameState.timeControl || 10);
         console.log('Loading game state...');
         game.loadState(gameState);
+        viewingMoveIndex = null;
+
+        // Reconstruct initial board by undoing all moves
+        initialBoard = [...game.board];
+        for (let i = game.moveHistory.length - 1; i >= 0; i--) {
+            const move = game.moveHistory[i];
+            initialBoard[move.from] = move.piece;
+            initialBoard[move.to] = move.captured || null;
+            if (move.isEnPassant) {
+                const capturedPawnIndex = move.to + (game.isWhitePiece(move.piece) ? -8 : 8);
+                initialBoard[capturedPawnIndex] = move.captured;
+                initialBoard[move.to] = null;
+            }
+        }
 
         // Save game for reconnection on refresh
         saveActiveGame();
@@ -665,6 +717,8 @@ function startOnlineGame(gameState, color) {
 
         UI.updateGameInfo(game);
         updateCapturedPieces();
+        viewingMoveIndex = null;
+        updateMoveNavButtons();
 
         if (result.gameStatus && result.gameStatus.gameOver) {
             handleGameEnd(result.gameStatus);
@@ -713,6 +767,7 @@ function startOnlineGame(gameState, color) {
         startTimerInterval();
 
         Sounds.gameStart();
+        updateMoveNavButtons();
         console.log('startOnlineGame completed successfully!');
     } catch (err) {
         console.error('Error in startOnlineGame:', err);
@@ -958,6 +1013,8 @@ function returnToMenu() {
     ai = null;
     aiThinking = false;
     lastReceivedMoveNum = 0;
+    initialBoard = null;
+    viewingMoveIndex = null;
 
     UI.hide('waiting-room');
     UI.hide('create-table-form');
@@ -1026,6 +1083,88 @@ function joinTable(gameId) {
 // Format time control for display
 function formatTimeControl(timeControl) {
     return timeControl === 0 ? 'Untimed' : `${timeControl} min`;
+}
+
+// Move history navigation
+function navigateMove(direction) {
+    if (!game || !game.moveHistory) return;
+
+    const totalMoves = game.moveHistory.length;
+    if (totalMoves === 0) return;
+
+    // Current position: null means live (= totalMoves)
+    let current = viewingMoveIndex !== null ? viewingMoveIndex : totalMoves;
+
+    switch (direction) {
+        case 'first': current = 0; break;
+        case 'prev': current = Math.max(0, current - 1); break;
+        case 'next': current = Math.min(totalMoves, current + 1); break;
+        case 'last': current = totalMoves; break;
+    }
+
+    if (current >= totalMoves) {
+        // Return to live view
+        viewingMoveIndex = null;
+        boardUI.returnToLive();
+    } else {
+        viewingMoveIndex = current;
+        const board = reconstructBoardAtMove(current);
+        const lastMove = current > 0 ? {
+            from: game.moveHistory[current - 1].from,
+            to: game.moveHistory[current - 1].to
+        } : null;
+        boardUI.displayPosition(board, lastMove);
+    }
+
+    updateMoveNavButtons();
+}
+
+// Reconstruct board state at a given move index
+// moveIndex 0 = initial position, 1 = after first move, etc.
+function reconstructBoardAtMove(moveIndex) {
+    if (!initialBoard) return game.board;
+
+    const board = [...initialBoard];
+    for (let i = 0; i < moveIndex; i++) {
+        const move = game.moveHistory[i];
+        // Handle en passant
+        if (move.isEnPassant) {
+            const capturedPawnIndex = move.to + (game.isWhitePiece(move.piece) ? -8 : 8);
+            board[capturedPawnIndex] = null;
+        }
+        board[move.to] = move.piece;
+        board[move.from] = null;
+        // Handle promotion
+        if (move.promotion) {
+            board[move.to] = move.promotion;
+        }
+    }
+    return board;
+}
+
+// Update move navigation button states
+function updateMoveNavButtons() {
+    const totalMoves = game ? game.moveHistory.length : 0;
+    const current = viewingMoveIndex !== null ? viewingMoveIndex : totalMoves;
+
+    const btnFirst = document.getElementById('btn-move-first');
+    const btnPrev = document.getElementById('btn-move-prev');
+    const btnNext = document.getElementById('btn-move-next');
+    const btnLast = document.getElementById('btn-move-last');
+    const label = document.getElementById('move-nav-label');
+
+    btnFirst.disabled = current <= 0;
+    btnPrev.disabled = current <= 0;
+    btnNext.disabled = current >= totalMoves;
+    btnLast.disabled = current >= totalMoves;
+
+    if (totalMoves === 0) {
+        label.textContent = '';
+    } else if (viewingMoveIndex !== null) {
+        label.textContent = `${current} / ${totalMoves}`;
+    } else {
+        label.textContent = `${totalMoves} / ${totalMoves}`;
+    }
 }
 
 // Update lobby display with available games
