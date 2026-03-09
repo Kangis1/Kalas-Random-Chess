@@ -16,8 +16,10 @@ async function initializeDatabase() {
     console.log('No DATABASE_URL set - running without database (guest mode only)');
     return;
   }
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -85,8 +87,9 @@ async function initializeDatabase() {
     console.log('Database tables initialized');
   } catch (err) {
     console.error('Error initializing database:', err);
+    console.log('Server will continue without database (guest mode only)');
   } finally {
-    client.release();
+    if (client) client.release();
   }
 }
 

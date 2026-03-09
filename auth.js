@@ -128,6 +128,10 @@ router.get('/me', async (req, res) => {
 
   const token = authHeader.split(' ')[1];
 
+  if (!pool) {
+    return res.status(503).json({ error: 'Database not available' });
+  }
+
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const result = await pool.query(
@@ -162,6 +166,10 @@ router.get('/stats', async (req, res) => {
   }
 
   const token = authHeader.split(' ')[1];
+
+  if (!pool) {
+    return res.status(503).json({ error: 'Database not available' });
+  }
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
