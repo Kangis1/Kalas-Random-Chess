@@ -607,6 +607,36 @@ io.on('connection', (socket) => {
         });
     });
 
+    // Chat message
+    socket.on('chatMessage', ({ gameId, message }) => {
+        const gameData = games.get(gameId);
+        if (!gameData) return;
+
+        // Only allow chat in active or finished games
+        if (gameData.state !== 'playing' && gameData.state !== 'finished' && gameData.state !== 'paused') return;
+
+        // Verify sender is a player in this game
+        const isWhite = gameData.white === socket.id;
+        const isBlack = gameData.black === socket.id;
+        if (!isWhite && !isBlack) return;
+
+        // Sanitize and limit message
+        const cleanMessage = String(message).slice(0, 200).trim();
+        if (!cleanMessage) return;
+
+        const senderInfo = playerInfo.get(socket.id);
+        const senderName = senderInfo?.username || (isWhite ? 'White' : 'Black');
+
+        // Send to opponent
+        const opponentId = isWhite ? gameData.black : gameData.white;
+        if (opponentId) {
+            io.to(opponentId).emit('chatMessage', {
+                sender: senderName,
+                message: cleanMessage
+            });
+        }
+    });
+
     // Cancel waiting game
     socket.on('cancelGame', ({ gameId }) => {
         const gameData = games.get(gameId);

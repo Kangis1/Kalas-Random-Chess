@@ -16,6 +16,8 @@ let currentGamePlayers = null; // { white: { username, elo }, black: { username,
 let lastReceivedMoveNum = 0; // Track last received move for dedup
 let initialBoard = null; // Starting board position for history replay
 let viewingMoveIndex = null; // null = live, 0 = start, N = after move N
+let chatOpen = false;
+let unreadMessages = 0;
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
@@ -347,6 +349,15 @@ function initializeSocket() {
         UI.show('main-lobby');
     });
 
+    // Chat message from opponent
+    socket.on('chatMessage', (data) => {
+        appendChatMessage(data.sender, data.message, false);
+        if (!chatOpen) {
+            unreadMessages++;
+            updateChatBadge();
+        }
+    });
+
     // Lobby updates
     socket.on('lobbyUpdate', (data) => {
         console.log('lobbyUpdate received:', data.games.length, 'games', data.games);
@@ -421,6 +432,11 @@ function initializeEventListeners() {
     document.getElementById('sound-toggle').addEventListener('click', toggleSound);
     // Initialize sound toggle icon based on saved preference
     updateSoundToggleIcon();
+
+    // Chat controls
+    document.getElementById('chat-toggle').addEventListener('click', toggleChat);
+    document.getElementById('chat-close').addEventListener('click', toggleChat);
+    document.getElementById('chat-form').addEventListener('submit', sendChatMessage);
 
     // Request lobby data on page load
     socket.emit('getLobby');
@@ -768,6 +784,7 @@ function startOnlineGame(gameState, color) {
 
         Sounds.gameStart();
         updateMoveNavButtons();
+        showChatPanel();
         console.log('startOnlineGame completed successfully!');
     } catch (err) {
         console.error('Error in startOnlineGame:', err);
@@ -1021,6 +1038,7 @@ function returnToMenu() {
     UI.show('main-lobby');
     UI.hideGameMessage();
     UI.showAIThinking(false);
+    hideChatPanel();
     UI.showScreen('menu-screen');
 
     // Refresh lobby data
@@ -1196,4 +1214,73 @@ function updateLobbyDisplay(games) {
         </div>
     `;
     }).join('');
+}
+
+// Chat functions
+function toggleChat() {
+    chatOpen = !chatOpen;
+    const chatBox = document.getElementById('chat-box');
+    if (chatOpen) {
+        chatBox.classList.remove('hidden');
+        unreadMessages = 0;
+        updateChatBadge();
+        document.getElementById('chat-input').focus();
+    } else {
+        chatBox.classList.add('hidden');
+    }
+}
+
+function sendChatMessage(e) {
+    e.preventDefault();
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    if (!message || !currentGameId) return;
+
+    socket.emit('chatMessage', { gameId: currentGameId, message });
+
+    const senderName = Auth.isLoggedIn() ? Auth.currentUser.username : (playerColor === 'white' ? 'White' : 'Black');
+    appendChatMessage(senderName, message, true);
+
+    input.value = '';
+}
+
+function appendChatMessage(sender, message, isMine) {
+    const messagesEl = document.getElementById('chat-messages');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `chat-msg ${isMine ? 'mine' : 'theirs'}`;
+
+    const senderSpan = document.createElement('span');
+    senderSpan.className = 'chat-sender';
+    senderSpan.textContent = sender;
+
+    const textNode = document.createTextNode(message);
+
+    msgDiv.appendChild(senderSpan);
+    msgDiv.appendChild(textNode);
+    messagesEl.appendChild(msgDiv);
+
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function updateChatBadge() {
+    const badge = document.getElementById('chat-badge');
+    if (unreadMessages > 0) {
+        badge.textContent = unreadMessages > 9 ? '9+' : unreadMessages;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+function showChatPanel() {
+    document.getElementById('chat-panel').classList.remove('hidden');
+}
+
+function hideChatPanel() {
+    document.getElementById('chat-panel').classList.add('hidden');
+    document.getElementById('chat-box').classList.add('hidden');
+    document.getElementById('chat-messages').innerHTML = '';
+    chatOpen = false;
+    unreadMessages = 0;
+    updateChatBadge();
 }
