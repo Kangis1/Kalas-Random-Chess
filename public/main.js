@@ -18,6 +18,7 @@ let initialBoard = null; // Starting board position for history replay
 let viewingMoveIndex = null; // null = live, 0 = start, N = after move N
 let chatOpen = false;
 let unreadMessages = 0;
+let syncCheckCounter = 0; // Counter for periodic sync checks
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
@@ -318,14 +319,31 @@ function initializeSocket() {
         startOnlineGame(data.gameState, data.color);
     });
 
-    // Reconnect errors (don't kick to lobby - game may still be active)
+    // Reconnect errors - retry if it's a race condition
     socket.on('reconnectError', (data) => {
         console.warn('Reconnect error:', data.message);
-        // Clear stale saved game if the game is truly gone
         if (data.message === 'Game not found' || data.message === 'Game is already finished') {
             clearActiveGame();
+        } else if (data.message === 'Game already has both players connected') {
+            // Race condition: old socket hasn't disconnected yet. Retry after a delay.
+            const savedGame = localStorage.getItem('activeGame');
+            if (savedGame) {
+                const gameData = JSON.parse(savedGame);
+                const retryCount = gameData.retryCount || 0;
+                if (retryCount < 5) {
+                    gameData.retryCount = retryCount + 1;
+                    localStorage.setItem('activeGame', JSON.stringify(gameData));
+                    const delay = 1000 * (retryCount + 1); // 1s, 2s, 3s, 4s, 5s
+                    console.log(`Retrying reconnect in ${delay}ms (attempt ${retryCount + 1}/5)`);
+                    setTimeout(() => {
+                        socket.emit('reconnectGame', { gameId: gameData.gameId });
+                    }, delay);
+                } else {
+                    console.warn('Max reconnect retries reached, giving up');
+                    clearActiveGame();
+                }
+            }
         }
-        // Don't show alert or kick to lobby - the player may still be in an active game
     });
 
     // Move-specific errors (don't kick to lobby)
@@ -824,6 +842,18 @@ function startTimerInterval() {
                 socket.emit('timeout', { gameId: currentGameId });
             }
             return;
+        }
+
+        // Periodic sync check for online games (every ~5 seconds)
+        if (!isLocalGame && !isAIGame && currentGameId) {
+            syncCheckCounter++;
+            if (syncCheckCounter >= 50) { // 50 * 100ms = 5 seconds
+                syncCheckCounter = 0;
+                socket.emit('syncCheck', {
+                    gameId: currentGameId,
+                    moveCount: lastReceivedMoveNum
+                });
+            }
         }
 
         // Low time warning sounds (only for player's turn in AI games)

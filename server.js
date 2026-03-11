@@ -457,22 +457,26 @@ io.on('connection', (socket) => {
         });
 
         // Set up retry - if not acknowledged within 2 seconds, resend
+        // IMPORTANT: Look up current opponent ID each retry (not the closure-captured one)
+        // because opponent's socket ID can change on reconnect
         const retryInterval = setInterval(() => {
-            const pending = gameData.pendingMoves?.get(moveNum);
-            if (!pending) {
+            const currentGameData = games.get(gameId);
+            const pending = currentGameData?.pendingMoves?.get(moveNum);
+            if (!pending || !currentGameData) {
                 clearInterval(retryInterval);
                 return;
             }
             pending.retries++;
             if (pending.retries > 5) {
-                // After 5 retries (10 seconds), stop retrying - opponent will sync via requestSync
                 console.log(`Move #${moveNum} not acknowledged after 5 retries, giving up retry`);
-                gameData.pendingMoves.delete(moveNum);
+                currentGameData.pendingMoves.delete(moveNum);
                 clearInterval(retryInterval);
                 return;
             }
-            console.log(`Retrying move #${moveNum} to opponent ${opponentId} (attempt ${pending.retries})`);
-            io.to(opponentId).emit('moveMade', {
+            // Look up fresh opponent socket ID from current game data
+            const currentOpponentId = playerColor === 'white' ? currentGameData.black : currentGameData.white;
+            console.log(`Retrying move #${moveNum} to opponent ${currentOpponentId} (attempt ${pending.retries})`);
+            io.to(currentOpponentId).emit('moveMade', {
                 gameState: pending.gameState,
                 gameStatus: pending.gameStatus,
                 moveNum: moveNum
@@ -510,6 +514,21 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Lightweight sync check - client sends its move count, server replies if mismatched
+    socket.on('syncCheck', ({ gameId, moveCount }) => {
+        const gameData = games.get(gameId);
+        if (!gameData) return;
+
+        const serverMoveCount = gameData.moveCount || 0;
+        if (moveCount !== serverMoveCount) {
+            console.log(`Sync mismatch for game ${gameId}: client has ${moveCount}, server has ${serverMoveCount}. Sending full sync.`);
+            socket.emit('fullSync', {
+                gameState: gameData.game.getState(),
+                moveCount: serverMoveCount
+            });
+        }
+    });
+
     // Client requests full state sync (recovery from desync)
     socket.on('requestSync', ({ gameId }) => {
         const gameData = games.get(gameId);
@@ -535,8 +554,25 @@ io.on('connection', (socket) => {
                 console.log(`requestSync: updating stale black socket ${gameData.black} -> ${socket.id} for game ${gameId}`);
                 gameData.black = socket.id;
             } else {
-                console.log(`requestSync: unknown socket ${socket.id} for game ${gameId}, ignoring`);
-                return;
+                // Both sockets alive - check if same user (page refresh race condition)
+                const syncInfo = playerInfo.get(socket.id);
+                const whiteInfo = playerInfo.get(gameData.white);
+                const blackInfo = playerInfo.get(gameData.black);
+
+                if (syncInfo?.userId && whiteInfo?.userId === syncInfo.userId && gameData.white !== socket.id) {
+                    playerColor = 'white';
+                    playerGames.delete(gameData.white);
+                    console.log(`requestSync: replaced stale white socket ${gameData.white} -> ${socket.id} (same userId)`);
+                    gameData.white = socket.id;
+                } else if (syncInfo?.userId && blackInfo?.userId === syncInfo.userId && gameData.black !== socket.id) {
+                    playerColor = 'black';
+                    playerGames.delete(gameData.black);
+                    console.log(`requestSync: replaced stale black socket ${gameData.black} -> ${socket.id} (same userId)`);
+                    gameData.black = socket.id;
+                } else {
+                    console.log(`requestSync: unknown socket ${socket.id} for game ${gameId}, ignoring`);
+                    return;
+                }
             }
             playerGames.set(socket.id, gameId);
             socket.join(gameId);
@@ -679,9 +715,29 @@ io.on('connection', (socket) => {
                 playerColor = 'black';
                 gameData.black = socket.id;
             } else {
-                // Both sockets are still alive - this might be a duplicate tab or stale localStorage
-                socket.emit('reconnectError', { message: 'Game already has both players connected' });
-                return;
+                // Both sockets appear alive - likely a page refresh where the old socket
+                // hasn't fully disconnected yet. Check if this is the same user by userId.
+                const reconnectingInfo = playerInfo.get(socket.id);
+                const whiteInfo = playerInfo.get(gameData.white);
+                const blackInfo = playerInfo.get(gameData.black);
+
+                if (reconnectingInfo?.userId && whiteInfo?.userId === reconnectingInfo.userId && gameData.white !== socket.id) {
+                    playerColor = 'white';
+                    const oldSocketId = gameData.white;
+                    gameData.white = socket.id;
+                    playerGames.delete(oldSocketId);
+                    console.log(`Reconnect: replaced stale white socket ${oldSocketId} with ${socket.id} (same userId)`);
+                } else if (reconnectingInfo?.userId && blackInfo?.userId === reconnectingInfo.userId && gameData.black !== socket.id) {
+                    playerColor = 'black';
+                    const oldSocketId = gameData.black;
+                    gameData.black = socket.id;
+                    playerGames.delete(oldSocketId);
+                    console.log(`Reconnect: replaced stale black socket ${oldSocketId} with ${socket.id} (same userId)`);
+                } else {
+                    // Truly a duplicate tab or different user
+                    socket.emit('reconnectError', { message: 'Game already has both players connected' });
+                    return;
+                }
             }
 
             console.log(`Fast reconnect: updating ${playerColor} socket to ${socket.id} for game ${gameId}`);
@@ -759,6 +815,15 @@ io.on('connection', (socket) => {
             const gameData = games.get(gameId);
 
             if (gameData) {
+                // Check if this socket has already been replaced by a reconnected socket
+                // (e.g. page refresh where new socket connected before old one disconnected)
+                const isCurrentPlayer = gameData.white === socket.id || gameData.black === socket.id;
+                if (!isCurrentPlayer) {
+                    console.log(`Disconnect from stale socket ${socket.id} for game ${gameId} - socket already replaced, ignoring`);
+                    playerGames.delete(socket.id);
+                    return;
+                }
+
                 if (gameData.state === 'waiting') {
                     // Don't delete immediately - give creator time to reconnect
                     // The registerPlayer handler will reclaim the game on reconnect
