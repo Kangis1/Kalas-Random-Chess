@@ -522,8 +522,6 @@ body::before {
 /* Game Screen */
 #game-screen {
     padding-top: 10px;
-    max-height: 100vh;
-    overflow-y: auto;
     position: relative;
 }
 
