@@ -519,10 +519,12 @@ body::before {
     }
 }
 
-/* Game Screen */
+/* Game Screen - no overflow/max-height to avoid double scrollbar */
 #game-screen {
     padding-top: 10px;
     position: relative;
+    overflow: visible !important;
+    max-height: none !important;
 }
 
 /* Sound Toggle Button */
