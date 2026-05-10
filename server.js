@@ -292,6 +292,7 @@ io.on('connection', (socket) => {
         const creator = playerInfo.get(socket.id);
         games.set(gameId, {
             game: game,
+            gameId: gameId,
             white: socket.id,
             black: null,
             state: 'waiting', // waiting, playing, finished
@@ -389,6 +390,53 @@ io.on('connection', (socket) => {
         console.log(`Player ${socket.id} joined game ${gameId}`);
     });
 
+    // Resolve which color a socket belongs to in a game, auto-fixing stale socket IDs
+    function resolvePlayerColor(gameData, socketId) {
+        if (gameData.white === socketId) return 'white';
+        if (gameData.black === socketId) return 'black';
+
+        // Socket ID doesn't match — check if either player's socket is dead and reclaim
+        const whiteSocket = io.sockets.sockets.get(gameData.white);
+        const blackSocket = io.sockets.sockets.get(gameData.black);
+
+        const info = playerInfo.get(socketId);
+
+        if (!whiteSocket || !whiteSocket.connected) {
+            const whiteInfo = playerInfo.get(gameData.white);
+            if (info && whiteInfo && info.userId === whiteInfo.userId) {
+                console.log(`resolvePlayerColor: reclaiming white socket ${gameData.white} -> ${socketId}`);
+                playerInfo.delete(gameData.white);
+                playerGames.delete(gameData.white);
+                gameData.white = socketId;
+                playerGames.set(socketId, gameData.gameId || '');
+                const sock = io.sockets.sockets.get(socketId);
+                if (sock) sock.join(gameData.gameId || '');
+                return 'white';
+            }
+        }
+
+        if (!blackSocket || !blackSocket.connected) {
+            const blackInfo = playerInfo.get(gameData.black);
+            if (info && blackInfo && info.userId === blackInfo.userId) {
+                console.log(`resolvePlayerColor: reclaiming black socket ${gameData.black} -> ${socketId}`);
+                playerInfo.delete(gameData.black);
+                playerGames.delete(gameData.black);
+                gameData.black = socketId;
+                playerGames.set(socketId, gameData.gameId || '');
+                const sock = io.sockets.sockets.get(socketId);
+                if (sock) sock.join(gameData.gameId || '');
+                return 'black';
+            }
+        }
+
+        return null;
+    }
+
+    // Get the current opponent socket ID from gameData (never stale)
+    function getOpponentId(gameData, playerColor) {
+        return playerColor === 'white' ? gameData.black : gameData.white;
+    }
+
     // Make a move
     socket.on('makeMove', ({ gameId, move }) => {
         const gameData = games.get(gameId);
@@ -403,8 +451,14 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // Verify it's this player's turn
-        const playerColor = gameData.white === socket.id ? 'white' : 'black';
+        // Resolve player identity — handles stale socket IDs from reconnection
+        gameData.gameId = gameId;
+        const playerColor = resolvePlayerColor(gameData, socket.id);
+        if (!playerColor) {
+            socket.emit('moveError', { message: 'You are not a player in this game' });
+            return;
+        }
+
         if (gameData.game.currentTurn !== playerColor) {
             socket.emit('moveError', { message: 'Not your turn' });
             return;
@@ -436,8 +490,8 @@ io.on('connection', (socket) => {
             gameStatus: result.gameStatus
         });
 
-        // Broadcast to opponent with retry logic
-        const opponentId = playerColor === 'white' ? gameData.black : gameData.white;
+        // Send to opponent — look up current ID from gameData each time (not a closure capture)
+        const opponentId = getOpponentId(gameData, playerColor);
         console.log(`Move #${moveNum} made by ${playerColor} (${socket.id}), sending to opponent ${opponentId}`);
 
         // Store pending move for retry
@@ -449,14 +503,13 @@ io.on('connection', (socket) => {
             retries: 0
         });
 
-        // Send to opponent
         io.to(opponentId).emit('moveMade', {
             gameState: gameState,
             gameStatus: result.gameStatus,
             moveNum: moveNum
         });
 
-        // Set up retry - if not acknowledged within 2 seconds, resend
+        // Retry logic — re-reads opponent ID from gameData each attempt so reconnections are picked up
         const retryInterval = setInterval(() => {
             const pending = gameData.pendingMoves?.get(moveNum);
             if (!pending) {
@@ -465,14 +518,14 @@ io.on('connection', (socket) => {
             }
             pending.retries++;
             if (pending.retries > 5) {
-                // After 5 retries (10 seconds), stop retrying - opponent will sync via requestSync
                 console.log(`Move #${moveNum} not acknowledged after 5 retries, giving up retry`);
                 gameData.pendingMoves.delete(moveNum);
                 clearInterval(retryInterval);
                 return;
             }
-            console.log(`Retrying move #${moveNum} to opponent ${opponentId} (attempt ${pending.retries})`);
-            io.to(opponentId).emit('moveMade', {
+            const currentOpponentId = getOpponentId(gameData, playerColor);
+            console.log(`Retrying move #${moveNum} to opponent ${currentOpponentId} (attempt ${pending.retries})`);
+            io.to(currentOpponentId).emit('moveMade', {
                 gameState: pending.gameState,
                 gameStatus: pending.gameStatus,
                 moveNum: moveNum
@@ -508,6 +561,32 @@ io.on('connection', (socket) => {
         if (gameData && gameData.pendingMoves) {
             gameData.pendingMoves.delete(moveNum);
         }
+    });
+
+    // In-game chat
+    socket.on('chatMessage', ({ gameId, text }) => {
+        if (!text || typeof text !== 'string') return;
+        const gameData = games.get(gameId);
+        if (!gameData) return;
+
+        // Verify sender is a player in this game
+        gameData.gameId = gameId;
+        const senderColor = resolvePlayerColor(gameData, socket.id);
+        if (!senderColor) return;
+
+        const info = playerInfo.get(socket.id);
+        const senderName = info?.username || (senderColor === 'white' ? 'White' : 'Black');
+
+        const msg = {
+            sender: senderName,
+            senderColor: senderColor,
+            text: text.slice(0, 200),
+            ts: Date.now()
+        };
+
+        // Send to both players
+        io.to(gameData.white).emit('chatMessage', msg);
+        io.to(gameData.black).emit('chatMessage', msg);
     });
 
     // Client requests full state sync (recovery from desync)
@@ -565,9 +644,10 @@ io.on('connection', (socket) => {
             gameData.state = 'finished';
             stopGameTimer(gameId);
 
-            // Notify opponent
-            const playerColor = gameData.white === socket.id ? 'white' : 'black';
-            const opponentId = playerColor === 'white' ? gameData.black : gameData.white;
+            gameData.gameId = gameId;
+            const playerColor = resolvePlayerColor(gameData, socket.id) ||
+                (gameData.white === socket.id ? 'white' : 'black');
+            const opponentId = getOpponentId(gameData, playerColor);
             io.to(opponentId).emit('timeout', timeout);
         }
     });
@@ -580,8 +660,10 @@ io.on('connection', (socket) => {
             return;
         }
 
-        const playerColor = gameData.white === socket.id ? 'white' : 'black';
-        const opponentId = playerColor === 'white' ? gameData.black : gameData.white;
+        gameData.gameId = gameId;
+        const playerColor = resolvePlayerColor(gameData, socket.id) ||
+            (gameData.white === socket.id ? 'white' : 'black');
+        const opponentId = getOpponentId(gameData, playerColor);
         const winner = playerColor === 'white' ? 'black' : 'white';
 
         gameData.state = 'finished';

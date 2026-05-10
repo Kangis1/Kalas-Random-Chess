@@ -352,6 +352,11 @@ function initializeSocket() {
         console.log('lobbyUpdate received:', data.games.length, 'games', data.games);
         updateLobbyDisplay(data.games);
     });
+
+    // Chat message received
+    socket.on('chatMessage', (msg) => {
+        appendChatMessage(msg);
+    });
 }
 
 // Initialize UI event listeners
@@ -421,6 +426,10 @@ function initializeEventListeners() {
     document.getElementById('sound-toggle').addEventListener('click', toggleSound);
     // Initialize sound toggle icon based on saved preference
     updateSoundToggleIcon();
+
+    // Chat toggle
+    document.getElementById('chat-toggle').addEventListener('click', toggleChat);
+    document.getElementById('chat-form').addEventListener('submit', sendChatMessage);
 
     // Request lobby data on page load
     socket.emit('getLobby');
@@ -768,6 +777,7 @@ function startOnlineGame(gameState, color) {
 
         Sounds.gameStart();
         updateMoveNavButtons();
+        showChat();
         console.log('startOnlineGame completed successfully!');
     } catch (err) {
         console.error('Error in startOnlineGame:', err);
@@ -1021,6 +1031,7 @@ function returnToMenu() {
     UI.show('main-lobby');
     UI.hideGameMessage();
     UI.showAIThinking(false);
+    hideChat();
     UI.showScreen('menu-screen');
 
     // Refresh lobby data
@@ -1196,4 +1207,91 @@ function updateLobbyDisplay(games) {
         </div>
     `;
     }).join('');
+}
+
+// --- Chat ---
+
+let chatOpen = false;
+let chatUnread = 0;
+
+function toggleChat() {
+    chatOpen = !chatOpen;
+    const panel = document.getElementById('chat-panel');
+    const toggle = document.getElementById('chat-toggle');
+
+    if (chatOpen) {
+        panel.classList.remove('hidden');
+        chatUnread = 0;
+        updateChatBadge();
+        const input = document.getElementById('chat-input');
+        input.focus();
+        const messages = document.getElementById('chat-messages');
+        messages.scrollTop = messages.scrollHeight;
+    } else {
+        panel.classList.add('hidden');
+    }
+}
+
+function sendChatMessage(e) {
+    e.preventDefault();
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text || !currentGameId) return;
+
+    socket.emit('chatMessage', { gameId: currentGameId, text });
+    input.value = '';
+}
+
+function appendChatMessage(msg) {
+    const container = document.getElementById('chat-messages');
+    const div = document.createElement('div');
+    div.className = 'chat-msg';
+
+    const sender = document.createElement('span');
+    sender.className = 'chat-sender ' + msg.senderColor;
+    sender.textContent = msg.sender + ':';
+
+    const text = document.createElement('span');
+    text.className = 'chat-text';
+    text.textContent = msg.text;
+
+    div.appendChild(sender);
+    div.appendChild(text);
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+
+    if (!chatOpen) {
+        chatUnread++;
+        updateChatBadge();
+    }
+}
+
+function updateChatBadge() {
+    const toggle = document.getElementById('chat-toggle');
+    let badge = toggle.querySelector('.chat-badge');
+    if (chatUnread > 0) {
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'chat-badge';
+            toggle.appendChild(badge);
+        }
+        badge.textContent = chatUnread > 9 ? '9+' : chatUnread;
+    } else if (badge) {
+        badge.remove();
+    }
+}
+
+function showChat() {
+    document.getElementById('chat-container').classList.remove('hidden');
+    chatOpen = false;
+    chatUnread = 0;
+    updateChatBadge();
+    document.getElementById('chat-messages').innerHTML = '';
+    document.getElementById('chat-panel').classList.add('hidden');
+}
+
+function hideChat() {
+    document.getElementById('chat-container').classList.add('hidden');
+    chatOpen = false;
+    chatUnread = 0;
 }
